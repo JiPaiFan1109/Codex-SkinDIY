@@ -54,7 +54,6 @@ try{
               Stop-DynamicManagerPreview
               Assert ($null -eq $ui.Controls.PreviewVideo.Source -and -not $ui.Playing) 'Preview did not release source'
               $handle=[IO.File]::Open($media,'Open','ReadWrite','None');$handle.Dispose()
-              $ui.Controls.AllFilter.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
               Start-DynamicManagerWork Rename $ui.Selected.Id '我的地球动态壁纸'
               $script:qa.Step=4
             }
@@ -65,7 +64,7 @@ try{
               }
               $ui.Window.UpdateLayout()
               $cardImages=@(Get-VisualImages $ui.Controls.WallpaperList)
-              Assert ($cardImages.Count -eq 2 -and @($cardImages|Where-Object {$null -ne $_.Source}).Count -eq 2) 'Card bitmap binding did not display thumbnails'
+              Assert ($cardImages.Count -eq 1 -and @($cardImages|Where-Object {$null -ne $_.Source}).Count -eq 1) 'Video filter did not display the selected video thumbnail'
               if($script:qa.CapturePath){
                 $ui.Window.UpdateLayout()
                 $dpi=[Windows.Media.VisualTreeHelper]::GetDpi($ui.Window)

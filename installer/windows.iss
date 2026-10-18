@@ -51,7 +51,7 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; Flags: checkedonce
 Source: "{#SourceRoot}\engine\*"; DestDir: "{app}\engine"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourceRoot}\scripts\*"; DestDir: "{app}\scripts"; Excludes: "check-upgrade.ps1"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#SourceRoot}\scripts\check-upgrade.ps1"; Flags: dontcopy
-Source: "{#SourceRoot}\appearance\skin-manager.ico"; DestDir: "{app}\appearance"; Flags: ignoreversion
+Source: "{#SourceRoot}\appearance\*"; DestDir: "{app}\appearance"; Flags: ignoreversion
 Source: "{#SourceRoot}\CodexSkinManager.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceRoot}\VERSION"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceRoot}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion

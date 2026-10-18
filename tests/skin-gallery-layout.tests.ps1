@@ -9,9 +9,9 @@ try{
     $window.Width=$size[0];$window.Height=$size[1]
     $window.Content.Measure([Windows.Size]::new($size[0],$size[1]));$window.Content.Arrange([Windows.Rect]::new(0,0,$size[0],$size[1]));$window.Content.UpdateLayout()
     foreach($name in @('ImportButton','ApplyButton','LocalNavButton','EngineNavButton','WallpaperList')){
-      $control=$window.FindName($name);$position=$control.TranslatePoint([Windows.Point]::new(0,0),$window.Content)
-      Assert ($control.ActualWidth -gt 0 -and $position.X -ge 0 -and $position.X+$control.ActualWidth -le $window.Content.ActualWidth+1) "Clipped horizontal action: $name"
-      Assert ($position.Y -ge 0 -and $position.Y+$control.ActualHeight -le $window.Content.ActualHeight+1) "Clipped vertical action: $name"
+      $control=$window.FindName($name);$bounds=$control.TransformToAncestor($window.Content).TransformBounds([Windows.Rect]::new(0,0,$control.ActualWidth,$control.ActualHeight));$position=$bounds.TopLeft
+      Assert ($control.ActualWidth -gt 0 -and $position.X -ge 0 -and $position.X+$bounds.Width -le $window.Content.ActualWidth+1) "Clipped horizontal action: $name"
+      Assert ($position.Y -ge 0 -and $position.Y+$bounds.Height -le $window.Content.ActualHeight+1) "Clipped vertical action: $name"
     }
     Assert ($window.FindName('PreviewOverlay').Visibility -eq 'Collapsed') 'Preview obscures library before a click'
   }
