@@ -15,19 +15,41 @@ function Get-DynamicWallpaperEngineRoots {
     }
   }
   @(foreach($library in $libraries|Sort-Object -Unique){
+    $manifest=Join-Path $library 'steamapps/appmanifest_431960.acf'
+    if(Test-Path -LiteralPath $manifest){
+      $match=[regex]::Match([IO.File]::ReadAllText($manifest),'"installdir"\s*"([^"\r\n]+)"')
+      if($match.Success -and $match.Groups[1].Value -notmatch '[/\\:]|^\.\.?$'){
+        foreach($suffix in @('myprojects','defaultprojects')){
+          $custom=Join-Path $library ('steamapps/common/'+$match.Groups[1].Value+'/projects/'+$suffix)
+          if(Test-Path -LiteralPath $custom -PathType Container){[IO.Path]::GetFullPath($custom)}
+        }
+      }
+    }
     foreach($relative in @('steamapps/workshop/content/431960','steamapps/common/wallpaper_engine/projects/myprojects','steamapps/common/wallpaper_engine/projects/defaultprojects')){
       $path=Join-Path $library $relative
       if(Test-Path -LiteralPath $path -PathType Container){[IO.Path]::GetFullPath($path)}
     }
   })|Sort-Object -Unique
 }
+function Get-DynamicWallpaperEngineProjects {
+  param([string]$Root,[int]$Depth=0)
+  Assert-DreamSkinNoReparseComponents -Path $Root
+  if(Test-Path -LiteralPath (Join-Path $Root 'project.json') -PathType Leaf){Get-Item -LiteralPath $Root;return}
+  if($Depth -ge 5){return}
+  foreach($child in Get-ChildItem -LiteralPath $Root -Directory -ErrorAction Stop){
+    if(($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){continue}
+    Get-DynamicWallpaperEngineProjects $child.FullName ($Depth+1)
+  }
+}
 function Import-DynamicWallpaperEngine {
   param([string[]]$Roots,[string]$StateRoot,[scriptblock]$Report)
   if(-not $Roots){$Roots=@(Get-DynamicWallpaperEngineRoots)}
   $result=[pscustomobject]@{Imported=0;Existing=0;Skipped=0;Failed=0;Details=@();SelectedId=$null;Roots=@($Roots)}
+  $visited=@{}
   foreach($root in $Roots|Sort-Object -Unique){
     Assert-DreamSkinNoReparseComponents -Path $root
-    foreach($directory in Get-ChildItem -LiteralPath $root -Directory){
+    foreach($directory in Get-DynamicWallpaperEngineProjects $root){
+      if($visited.ContainsKey($directory.FullName)){continue};$visited[$directory.FullName]=$true
       $label=$directory.Name
       try{
         Assert-DreamSkinNoReparseComponents -Path $directory.FullName
@@ -48,7 +70,7 @@ function Import-DynamicWallpaperEngine {
         if(-not (Test-Path -LiteralPath $media -PathType Leaf)){throw '项目媒体文件不存在。'}
         $kind='Image';if($project.type -eq 'video'){$kind='Video'}
         if($Report){& $Report ('正在导入：'+$label)}
-        $import=Import-DynamicWallpaper -SourcePath $media -Kind $kind -StateRoot $StateRoot -Report $Report
+        $import=Import-DynamicWallpaper -SourcePath $media -Kind $kind -StateRoot $StateRoot -Report $Report -Source WallpaperEngine
         $result.SelectedId=$import.Item.Id
         if($import.AlreadyExists){$result.Existing++}else{
           $result.Imported++

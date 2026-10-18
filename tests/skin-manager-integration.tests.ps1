@@ -80,7 +80,24 @@ try{
             5 {
               Assert ($ui.Items.Count -eq 1) 'Stopped video could not be deleted'
               Assert (-not (Test-Path (Join-Path $root 'active-theme'))) 'PrepareOnly UI changed background'
-              $script:qa.Timer.Stop();$ui.Window.Close();$script:qa.Step=6
+              $project=Join-Path $root 'renamed collection/project'
+              [IO.Directory]::CreateDirectory($project)|Out-Null
+              Copy-Item (Join-Path $repo 'docs/images/earth-preview.png') (Join-Path $project 'image.png')
+              [IO.File]::WriteAllText((Join-Path $project 'project.json'),'{"type":"image","file":"image.png","title":"Engine fixture"}')
+              Start-DynamicManagerWork EngineImport $project;$script:qa.Step=6
+            }
+            6 {
+              Assert ($ui.Source -eq 'WallpaperEngine' -and $ui.Controls.WallpaperList.Items.Count -eq 1) 'Engine import did not display engine gallery'
+              Assert ($ui.Controls.EnginePanel.Visibility -eq 'Collapsed' -and $ui.Controls.EngineNavLabel.Visibility -eq 'Visible') 'Engine landing obscures imported wallpapers'
+              $ui.Controls.LocalNavButton.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
+              Assert ($ui.Source -eq 'Local' -and $ui.Controls.WallpaperList.Items.Count -eq 1) 'Local tab lost explicit manual import'
+              $ui.Controls.OpenButton.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
+              Assert ($ui.Busy -and $ui.Controls.ConnectionLoading.Visibility -eq 'Visible') 'Connection icon did not start retry spinner'
+              $script:qa.Step=7
+            }
+            7 {
+              Assert ($ui.Controls.ConnectionLoading.Visibility -eq 'Collapsed') 'Connection retry left spinner running'
+              $script:qa.Timer.Stop();$ui.Window.Close();$script:qa.Step=8
             }
           }
         }catch{
@@ -94,7 +111,7 @@ try{
   }
   Show-DynamicSkinManager -InstallRoot $repo -StateRoot $root -PrepareOnly
   if($script:qa.Error){throw $script:qa.Error}
-  Assert ($script:qa.Step -eq 6) 'UI closed before integration finished'
+  Assert ($script:qa.Step -eq 8) 'UI closed before integration finished'
   'PASS: WPF background import, selection, filtering, real H.264 playback, handle release, rename and delete'
 }finally{
   Set-Item Function:New-DynamicSkinManagerWindow $originalWindow

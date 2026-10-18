@@ -44,3 +44,17 @@
 最终候选：`D:/CodexSkin-v1-validation-20261018/release-candidate-final`。此前 release-candidate 和 release-candidate-v2 均为被替代的测试包，不应发布。
 
 证据（代码目录下）：`dist/v1-tests-complete.log`、`dist/v1-refined-integration.log`、`dist/v1-legacy-update.log`、`dist/v1-build-final.log`、`dist/real-import-results.json`、`dist/gallery-12-fixtures.png`、`dist/update-v1-refined.png`、`dist/codex-preview-refined.png`。本地 Wallpaper Engine 预览素材不作为项目分发资产。
+
+## 2026-10-18 后续交互修订（尚未发布）
+
+- 本地手动导入与 Wallpaper Engine 导入保存来源标记并分别展示；同内容跨来源去重后保留两类成员资格。原来没有来源标记的历史项目保持在本地分类，不能凭文件名猜测来源。
+- Steam 安装清单支持改名后的安装目录；手动选择支持父目录、安装目录和单个项目目录，跳过重解析子目录，扫描深度最多五层。
+- 左侧选中背景上下滑动，选中项展示图标和文字；未选中项只显示居中图标。动态/静态选择滑块左右滑动，使用 240ms 缓出过渡。
+- 连接角标核验真实 CDP 会话身份及版本。成功绿勾、失败红叉；失败次级文字为“未找到Codex”。悬停显示连接信息；点击图标只读重新检测并显示转动加载环。“打开 Codex”移至管理面板。
+- 按已确认参考图加入白色圆角确认框、绿色成功提示和红色失败提示；应用、删除、批量导入接入确认流程。
+- 新增来源分离、改名路径、连接身份/版本、滑块动画、加载动画、确认取消/防重复和提示条测试；WPF 集成测试增加批量导入后切换来源及点击图标重试。
+- 此次修订晚于前述候选包。`release-candidate-final` 已不是当前代码，发布前必须重新构建、签名和校验；用户仍未授权发布。
+- 新预览使用 `D:/CodexSkin-v1-validation-20261018/preview-navigation` 的隔离测试库，不替换正式壁纸库；连接检测是只读真实检测，应用功能保持禁用。
+
+本轮最终回归：25 项 Node 测试、43 个 Windows 测试脚本全部通过（dist/navigation-all-tests.log）。
+

@@ -1,0 +1,28 @@
+﻿$ErrorActionPreference='Stop'
+$repo=Split-Path $PSScriptRoot -Parent
+. "$repo/scripts/skin-manager.ps1"
+function Assert($c,$m){if(-not $c){throw $m}}
+$w=New-DynamicSkinManagerWindow
+try{
+ Assert ($null -ne $w.FindName('NavThumbTransform')) 'Animated navigation selector is missing'
+ $controls=@{};foreach($m in [regex]::Matches([IO.File]::ReadAllText("$repo/scripts/skin-manager.xaml"),'x:Name="([^"]+)"')){$controls[$m.Groups[1].Value]=$w.FindName($m.Groups[1].Value)}
+ $script:SkinManager=@{Window=$w;Controls=$controls;Source='Local';Filter='Video';Connection=[pscustomobject]@{Available=$true;Connected=$true;Message='Connected'};PrepareOnly=$false}
+ Update-DynamicManagerConnectionBadge
+ Assert ($controls.ConnectionBadgeText.Text -eq [char]0x2713 -and $controls.ConnectionBadge.Background.Color.G -gt $controls.ConnectionBadge.Background.Color.R) 'Connected badge is not green check'
+ $script:SkinManager.Connection.Connected=$false;Update-DynamicManagerConnectionBadge
+ Assert ($controls.ConnectionBadgeText.Text -eq [char]0x00d7 -and $controls.ConnectionBadge.Background.Color.R -gt $controls.ConnectionBadge.Background.Color.G) 'Disconnected badge is not red cross'
+ Update-DynamicManagerNavigation -Animate:$false
+ Assert ($controls.LocalNavLabel.Visibility -eq 'Visible' -and $controls.EngineNavLabel.Visibility -eq 'Collapsed') 'Local navigation did not expand exclusively'
+ $script:SkinManager.Source='WallpaperEngine';Update-DynamicManagerNavigation -Animate:$false
+ Assert ($controls.LocalNavLabel.Visibility -eq 'Collapsed' -and $controls.EngineNavLabel.Visibility -eq 'Visible' -and $controls.NavThumbTransform.Y -eq 80) 'Engine navigation did not expand and move selection'
+ $script:SkinManager.Filter='Video';Update-DynamicManagerFilterSlider -Animate:$false
+ Assert ($controls.FilterThumbTransform.X -eq 0) 'Video thumb is not at first segment'
+ $script:SkinManager.Filter='Image';Update-DynamicManagerFilterSlider
+ Assert $controls.FilterThumbTransform.HasAnimatedProperties 'Filter transition has no animation'
+ $end=[datetime]::UtcNow.AddMilliseconds(350)
+ while([datetime]::UtcNow -lt $end){$frame=New-Object Windows.Threading.DispatcherFrame;$null=$w.Dispatcher.BeginInvoke([Windows.Threading.DispatcherPriority]::Background,[Action]{$frame.Continue=$false});[Windows.Threading.Dispatcher]::PushFrame($frame)}
+ Assert ([math]::Abs($controls.FilterThumbTransform.X-108) -lt 0.1) 'Filter thumb did not reach static segment'
+ $script:SkinManager.Source='Local';Update-DynamicManagerNavigation
+ Assert $controls.NavThumbTransform.HasAnimatedProperties 'Navigation transition has no animation'
+ 'PASS connection badges, exclusive navigation labels and moving selector animations'
+}finally{$w.Close();$script:SkinManager=$null}

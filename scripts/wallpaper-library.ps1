@@ -55,7 +55,7 @@ function Get-DynamicWallpaperDirectory {
 
 function Read-DynamicWallpaperItem {
   param([string]$Directory,[string]$Id)
-  $item=[pscustomobject]@{Id=$Id;Name='不可用壁纸';Kind='Unknown';MediaPath=$null;ThumbnailPath=$null;Size=0L;Sha256=$null;ImportedAtUtc=[datetime]::MinValue;IsAvailable=$false;Error=$null;DiskSize=0L}
+  $item=[pscustomobject]@{Id=$Id;Name='不可用壁纸';Kind='Unknown';MediaPath=$null;ThumbnailPath=$null;Size=0L;Sha256=$null;ImportedAtUtc=[datetime]::MinValue;IsAvailable=$false;Error=$null;DiskSize=0L;Sources=@('Local')}
   try {
     Assert-DreamSkinNoReparseComponents -Path $Directory
     $json=Join-Path $Directory 'item.json'
@@ -64,6 +64,7 @@ function Read-DynamicWallpaperItem {
     if($entry.schema -cne 'codex-dynamic-skin-wallpaper/1' -or $entry.id -cne $Id -or $entry.kind -cnotin @('Image','Video')){throw '壁纸元数据格式无效。'}
     $item.Name=Assert-DynamicWallpaperName ([string]$entry.name)
     $item.Kind=$entry.kind
+    if($entry.sources){$item.Sources=@($entry.sources|Where-Object {$_ -in @('Local','WallpaperEngine')}|Select-Object -Unique)}
     $pattern='^wallpaper\.(png|jpg|jpeg|webp)$'; if($entry.kind -eq 'Video'){$pattern='^wallpaper\.mp4$'}
     if([string]$entry.mediaFile -cnotmatch $pattern -or $entry.thumbnailFile -cne 'thumbnail.png'){throw '壁纸文件路径无效。'}
     if([string]$entry.sha256 -cnotmatch '^[0-9a-f]{64}$'){throw '壁纸校验值无效。'}
@@ -129,7 +130,10 @@ function Complete-DynamicWallpaperImport {
   $displayName=Assert-DynamicWallpaperName $Name
   Invoke-DynamicWallpaperLock $StateRoot {
     $existing=@(Get-DynamicWallpaperItems $StateRoot | Where-Object { $_.IsAvailable -and $_.Kind -eq $Prepared.Kind -and $_.Sha256 -eq $Prepared.Sha256 -and (Get-FileHash -LiteralPath $_.MediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $Prepared.Sha256 })
-    if($existing.Count -gt 0){return [pscustomobject]@{Item=$existing[0];AlreadyExists=$true}}
+    if($existing.Count -gt 0){
+      $source='Local';if($Prepared.ImportSource){$source=$Prepared.ImportSource}
+      return [pscustomobject]@{Item=(Add-DynamicWallpaperSource $StateRoot $existing[0].Id $source);AlreadyExists=$true}
+    }
     $id=[guid]::NewGuid().ToString('N')
     $extension=[IO.Path]::GetExtension($Prepared.Path).ToLowerInvariant()
     $mediaName='wallpaper'+$extension
@@ -138,6 +142,7 @@ function Complete-DynamicWallpaperImport {
     # A prepared image is the media itself; no second full-size copy is retained.
     $entry=[ordered]@{schema='codex-dynamic-skin-wallpaper/1';id=$id;name=$displayName;kind=$Prepared.Kind;mediaFile=$mediaName;thumbnailFile='thumbnail.png';size=$Prepared.Size;sha256=$Prepared.Sha256;importedAtUtc=[datetime]::UtcNow.ToString('o')}
     if($Prepared.SourceSha256){$entry.sourceSha256=$Prepared.SourceSha256}
+    $entry.sources=@('Local');if($Prepared.ImportSource){$entry.sources=@($Prepared.ImportSource)}
     if(Get-Command New-DynamicWallpaperThumbnail -ErrorAction SilentlyContinue){
       if(-not (New-DynamicWallpaperThumbnail $destination $Prepared.Kind (Join-Path $directory 'thumbnail.png')) -and $Report){& $Report '媒体已保存，缩略图暂不可用。'}
     }
@@ -149,8 +154,23 @@ function Complete-DynamicWallpaperImport {
   }
 }
 
+function Add-DynamicWallpaperSource {
+  param([string]$StateRoot,[string]$Id,[ValidateSet('Local','WallpaperEngine')][string]$Source)
+  Invoke-DynamicWallpaperLock $StateRoot {
+    $item=Get-DynamicWallpaperItem $StateRoot $Id
+    if(-not $item.IsAvailable){throw $item.Error}
+    if($item.Sources -notcontains $Source){
+      $path=Join-Path (Get-DynamicWallpaperDirectory $StateRoot $Id) 'item.json'
+      $entry=[IO.File]::ReadAllText($path)|ConvertFrom-Json
+      $entry|Add-Member -NotePropertyName sources -NotePropertyValue @(@($item.Sources)+$Source|Select-Object -Unique) -Force
+      Write-DreamSkinUtf8FileAtomically -Path $path -Content ($entry|ConvertTo-Json)
+    }
+    Get-DynamicWallpaperItem $StateRoot $Id
+  }
+}
+
 function Import-DynamicWallpaper {
-  param([string]$SourcePath,[ValidateSet('Image','Video')][string]$Kind,[string]$StateRoot,[scriptblock]$Report)
+  param([string]$SourcePath,[ValidateSet('Image','Video')][string]$Kind,[string]$StateRoot,[scriptblock]$Report,[ValidateSet('Local','WallpaperEngine')][string]$Source='Local')
   $paths=Get-DynamicWallpaperPaths $StateRoot
   Assert-DreamSkinNoReparseComponents -Path $SourcePath
   $sourceInfo=Get-Item -LiteralPath $SourcePath -ErrorAction Stop
@@ -162,13 +182,14 @@ function Import-DynamicWallpaper {
       $metadata=Join-Path (Split-Path $existing.MediaPath) 'item.json'
       $entry=[IO.File]::ReadAllText($metadata)|ConvertFrom-Json
       if(($existing.Sha256 -eq $sourceHash -or $entry.sourceSha256 -eq $sourceHash) -and (Get-FileHash -LiteralPath $existing.MediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $existing.Sha256){
-        return [pscustomobject]@{Item=$existing;AlreadyExists=$true}
+        return [pscustomobject]@{Item=(Add-DynamicWallpaperSource $StateRoot $existing.Id $Source);AlreadyExists=$true}
       }
     }
   }
   $prepared=$null
   try {
     $prepared=New-DynamicPreparedMedia -SourcePath $SourcePath -Kind $Kind -StateRoot $StateRoot -PreparationRoot $paths.Staging -Report $Report
+    $prepared|Add-Member -NotePropertyName ImportSource -NotePropertyValue $Source
     $name=[IO.Path]::GetFileNameWithoutExtension($SourcePath)
     # Long source filenames still produce a usable editable display name.
     if($name.Length -gt 120){$name=$name.Substring(0,120);if([char]::IsHighSurrogate($name[$name.Length-1])){$name=$name.Substring(0,$name.Length-1)}}

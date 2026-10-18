@@ -1,14 +1,30 @@
 ﻿function Get-DynamicVisibleWallpapers {
-  param($Items,[ValidateSet('All','Image','Video')][string]$Filter)
-  @($Items | Where-Object { $Filter -eq 'All' -or $_.Kind -eq $Filter })
+  param($Items,[ValidateSet('All','Image','Video')][string]$Filter,[ValidateSet('All','Local','WallpaperEngine')][string]$Source='All')
+  @($Items | Where-Object {
+    $sources=@($_.Sources);if(-not $_.Sources){$sources=@('Local')}
+    ($Filter -eq 'All' -or $_.Kind -eq $Filter) -and ($Source -eq 'All' -or $sources -contains $Source)
+  })
 }
 
 function Get-DynamicCodexConnection {
+  param([string]$StateRoot=(Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'))
   try {
     $codex=Get-DreamSkinCodexInstall
-    [pscustomobject]@{Available=$true;Message=('已找到 Codex · '+$codex.Version);Executable=$codex.Executable;Error=$null}
+    $connected=$false;$version=$codex.Version
+    if(Get-Command Read-DreamSkinState -ErrorAction SilentlyContinue){
+      try{
+        $state=Read-DreamSkinState -Path (Join-Path $StateRoot 'state.json')
+        if($state -and $state.port){
+          $verified=Get-DreamSkinVerifiedCdpIdentityForAnyRegistered -Port $state.port
+          if($verified -and $verified.Identity.BrowserId -eq $state.browserId){$connected=$true;$version=$verified.Codex.Version}
+        }
+      }catch{}
+    }
+    $message='连接失败 · 已安装 Codex '+$version+'，尚未建立换肤连接。'
+    if($connected){$message='连接成功 · Codex '+$version}
+    [pscustomobject]@{Available=$true;Connected=$connected;Version=$version;Message=$message;Executable=$codex.Executable;Error=$null}
   }catch{
-    [pscustomobject]@{Available=$false;Message='未找到可用的 Codex，请先安装官方 Windows 版，再点击重新检测。';Executable=$null;Error=$_.Exception.Message}
+    [pscustomobject]@{Available=$false;Connected=$false;Version=$null;Message='连接失败 · 未找到可用的 Codex，请先安装官方 Windows 版，再点击重新检测。';Executable=$null;Error=$_.Exception.Message}
   }
 }
 
@@ -130,6 +146,9 @@ function Update-DynamicManagerButtons {
   $ui.Controls.SaveCurrentButton.IsEnabled=(-not $ui.Busy -and $ui.Status.HasExternalCurrent -and -not $ui.Status.Error)
   $ui.Controls.PlayButton.IsEnabled=(-not $ui.Busy)
   $ui.Controls.DetectButton.IsEnabled=(-not $ui.Busy)
+  $ui.Controls.OpenButton.IsEnabled=$true
+  if($ui.Controls.OpenCodexButton){$ui.Controls.OpenCodexButton.IsEnabled=$state.Open}
+  foreach($name in @('LocalNavButton','EngineNavButton','AllFilter','ImageFilter','VideoFilter')){if($ui.Controls[$name]){$ui.Controls[$name].IsEnabled=(-not $ui.Busy)}}
   foreach($name in @('EngineImportButton','EngineFolderButton','PreviewApplyButton')){if($ui.Controls[$name]){$ui.Controls[$name].IsEnabled=(-not $ui.Busy)}}
   if($ui.Controls.PreviewApplyButton){$ui.Controls.PreviewApplyButton.IsEnabled=$state.Apply}
   if($ui.Controls.CheckUpdateButton){
@@ -179,7 +198,8 @@ function Update-DynamicManagerList {
   param([string]$SelectedId)
   $ui=$script:SkinManager
   if(-not $SelectedId -and $ui.Selected){$SelectedId=$ui.Selected.Id}
-  $views=@(foreach($item in Get-DynamicVisibleWallpapers $ui.Items $ui.Filter){
+  $source='Local';if($ui.Source){$source=$ui.Source}
+  $views=@(foreach($item in Get-DynamicVisibleWallpapers $ui.Items $ui.Filter $source){
     $kind='静态';$placeholder='图片';if($item.Kind -eq 'Video'){$kind='动态';$placeholder='视频'}
     if(-not $item.IsAvailable){$kind='不可用';$placeholder='!'}
     $visibility='Collapsed';if($ui.Status.CurrentId -eq $item.Id){$visibility='Visible'}
@@ -206,9 +226,10 @@ function Update-DynamicManagerList {
     if($ui.Filter -eq $name){
       $ui.Controls[($name+'Filter')].BorderBrush=[Windows.Media.BrushConverter]::new().ConvertFromString('#EDEDF0')
       $ui.Controls[($name+'Filter')].Foreground=[Windows.Media.BrushConverter]::new().ConvertFromString('#172134')
-      $ui.Controls[($name+'Filter')].Background=[Windows.Media.Brushes]::White
     }
   }
+  Update-DynamicManagerNavigation
+  Update-DynamicManagerFilterSlider
   Update-DynamicManagerSelection
 }
 
@@ -219,6 +240,8 @@ function Start-DynamicManagerWork {
   Stop-DynamicManagerPreview
   $ui.Busy=$true;$ui.Controls.WorkProgress.Visibility='Visible';$ui.Controls.StatusText.Text='正在处理…'
   $ui.Controls.StatusText.Visibility='Visible'
+  if($Operation -eq 'Refresh'){Set-DynamicConnectionChecking $true}
+  $ui.PendingOperation=$Operation
   Update-DynamicManagerButtons
   $queue=New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
   $worker=[PowerShell]::Create()
@@ -232,8 +255,8 @@ function Start-DynamicManagerWork {
     . (Join-Path $ModuleRoot 'skin-manager.ps1')
     $report={param($message)$Queue.Enqueue([string]$message)}
     if($PrepareOnly -and $Operation -in @('Apply','Open','Restore')){throw '预览模式不能更改真实 Codex。'}
-    $connection=[pscustomobject]@{Available=$false;Message='预览模式 · 不连接 Codex';Error=$null;Executable=$null}
-    if(-not $PrepareOnly){$connection=Get-DynamicCodexConnection}
+    # Detection is read-only, including in preview mode. Apply/open/restore remain blocked there.
+    $connection=Get-DynamicCodexConnection
     if($Operation -in @('Apply','Open') -and -not $connection.Available){throw $connection.Message}
     $selected=$null;$message='壁纸库已加载。';$engineReport=$null
     try { switch($Operation){
@@ -268,6 +291,7 @@ function Start-DynamicManagerWork {
       $selected=$Argument;$message='已取消操作，原有外观未改变。'
     }
     $status=Get-DynamicWallpaperStatus $StateRoot
+    if($Operation -in @('Apply','Open','Restore')){$connection=Get-DynamicCodexConnection}
     if($status.Error){$message='读取当前背景失败：'+$status.Error}
     elseif($Operation -eq 'Refresh' -and $status.HasExternalCurrent){$message='可点击“保存当前背景”，将当前画面加入收藏。'}
     if($PrepareOnly){$message='预览模式 · '+$message}
@@ -291,8 +315,7 @@ function Complete-DynamicManagerWork {
     $ui.Items=@($result.Items);$ui.Status=$result.Status;$ui.Controls.StatusText.Text=$result.Message
     if($null -ne $result.EngineReport){$ui.Controls.EngineReport.Text=$result.EngineReport}
     $ui.Connection=$result.Connection;$ui.Controls.ConnectionText.Text=$result.Connection.Message
-    $ui.Window.FindName('ConnectionBadge').Visibility='Collapsed'
-    if($result.Connection.Available){$ui.Window.FindName('ConnectionBadge').Visibility='Visible'}
+    Update-DynamicManagerConnectionBadge
     $ui.Controls.ConnectionText.ToolTip=$result.Connection.Executable
     if($result.Connection.Error){$ui.Controls.ConnectionText.ToolTip=$result.Connection.Error}
     if($result.SelectedId -and $ui.Filter -ne 'All'){
@@ -300,20 +323,31 @@ function Complete-DynamicManagerWork {
       if($selected.Count -and $selected[0].Kind -ne $ui.Filter){$ui.Filter=$selected[0].Kind}
     }
     if(-not $result.SelectedId -and $ui.Filter -eq 'Video' -and $ui.Items.Count -and @($ui.Items|Where-Object Kind -eq 'Video').Count -eq 0){$ui.Filter='Image'}
+    if($ui.PendingOperation -in @('Import','SaveCurrent')){$ui.Source='Local'}
+    if($ui.PendingOperation -eq 'EngineImport'){$ui.Source='WallpaperEngine'}
+    if($ui.Filter -eq 'All'){
+      $kinds=@(Get-DynamicVisibleWallpapers $ui.Items All $ui.Source|Select-Object -ExpandProperty Kind -Unique)
+      if($kinds.Count -eq 1 -and $kinds[0] -in @('Image','Video')){$ui.Filter=$kinds[0]}
+    }
     Update-DynamicManagerList $result.SelectedId
+    if($ui.PendingOperation -eq 'Apply'){Show-DynamicManagerToast '壁纸已应用' Success}
+    if($ui.PendingOperation -eq 'Refresh' -and $ui.HasCheckedConnection){
+      if($ui.Connection.Connected){Show-DynamicManagerToast ('连接成功 · Codex '+$ui.Connection.Version) Success}else{Show-DynamicManagerToast '连接失败，请重试' Error}
+    }
+    if($ui.PendingOperation -eq 'Refresh'){$ui.HasCheckedConnection=$true}
     $prompt=$result.PromptCurrent -and -not $ui.PromptShown
   }catch{
     $errorMessage=Get-DynamicManagerErrorMessage $_.Exception
     $ui.Controls.StatusText.Text='操作未完成：'+$errorMessage
-    [Windows.MessageBox]::Show($ui.Window,$errorMessage,'操作未完成','OK','Warning')|Out-Null
+    Show-DynamicManagerToast ('操作未完成：'+$errorMessage) Error
   }finally{
+    Set-DynamicConnectionChecking $false
     $ui.Worker.Dispose();$ui.Runspace.Dispose();$ui.Worker=$null;$ui.Runspace=$null;$ui.Async=$null
     $ui.Busy=$false;$ui.Controls.WorkProgress.Visibility='Collapsed';Update-DynamicManagerButtons
   }
   if($prompt){
     $ui.PromptShown=$true
-    $choice=[Windows.MessageBox]::Show($ui.Window,'是否将当前使用的背景保存到壁纸库？选择“否”后仍可随时手动保存。','保存当前背景','YesNo','Question')
-    if($choice -eq 'Yes'){Start-DynamicManagerWork SaveCurrent}else{Start-DynamicManagerWork DismissPrompt}
+    Show-DynamicManagerConfirmation '保存当前背景？' '将当前使用的背景保存到本地壁纸，稍后也可手动保存。' {Start-DynamicManagerWork SaveCurrent} {Start-DynamicManagerWork DismissPrompt} '保存'
   }
 }
 
@@ -336,27 +370,31 @@ function Show-DynamicSkinManager {
   $window=New-DynamicSkinManagerWindow
   $controls=@{}
   foreach($name in @('ImportButton','AllFilter','ImageFilter','VideoFilter','WallpaperList','LibrarySummary','EmptyState','EmptyTitle','PreviewPlaceholder','PreviewImage','PreviewVideo','PlayButton','SelectedName','SelectedDetails','SelectedFormat','SelectedSize','SelectedImportedAt','SelectedStatus','PreviewNotice','ApplyButton','RenameButton','DeleteButton','SaveCurrentButton','WorkProgress','StatusText','OpenButton','RestoreButton','ConnectionText','DetectButton')){$controls[$name]=$window.FindName($name)}
-  foreach($name in @('LocalNavButton','EngineNavButton','EngineImportButton','EngineFolderButton','EnginePanel','EngineReport','SettingsButton','SettingsPanel','PreviewOverlay','ClosePreviewButton','PreviewApplyButton')){$controls[$name]=$window.FindName($name)}
-  $script:SkinManager=@{Window=$window;Controls=$controls;InstallRoot=$InstallRoot;StateRoot=$StateRoot;ModuleRoot=$PSScriptRoot;PrepareOnly=[bool]$PrepareOnly;Items=@();Status=[pscustomobject]@{CurrentId=$null;Paused=$false;HasExternalCurrent=$false;Error=$null};Selected=$null;Filter='Video';Busy=$false;Playing=$false;PromptShown=$false;Worker=$null;Runspace=$null;Async=$null}
+  foreach($name in @('LocalNavButton','EngineNavButton','EngineImportButton','EngineFolderButton','EnginePanel','EngineReport','SettingsButton','SettingsPanel','PreviewOverlay','ClosePreviewButton','PreviewApplyButton','EngineToolbar','LocalNavLabel','EngineNavLabel','LocalNavIcon','EngineNavIcon','NavThumbTransform','FilterThumb','FilterThumbTransform','ConnectionBadge','ConnectionBadgeText','ConnectionLoading','ConnectionSpinner','OpenCodexButton')){$controls[$name]=$window.FindName($name)}
+  foreach($name in @('ConnectionLabel','ConnectionDetail','ConfirmationOverlay','ConfirmationTitle','ConfirmationMessage','ConfirmAcceptButton','ConfirmCancelButton','ConfirmCloseButton','ToastPanel','ToastIcon','ToastIconBorder','ToastMessage')){$controls[$name]=$window.FindName($name)}
+  $script:SkinManager=@{Window=$window;Controls=$controls;InstallRoot=$InstallRoot;StateRoot=$StateRoot;ModuleRoot=$PSScriptRoot;PrepareOnly=[bool]$PrepareOnly;Items=@();Status=[pscustomobject]@{CurrentId=$null;Paused=$false;HasExternalCurrent=$false;Error=$null};Selected=$null;Source='Local';Filter='All';Busy=$false;Playing=$false;PromptShown=$false;Worker=$null;Runspace=$null;Async=$null}
   $timer=New-Object Windows.Threading.DispatcherTimer;$timer.Interval=[timespan]::FromMilliseconds(120);$timer.Add_Tick({Complete-DynamicManagerWork});$script:SkinManager.Timer=$timer
   $script:SkinManager.Connection=[pscustomobject]@{Available=$false}
   . (Join-Path $PSScriptRoot 'update-ui.ps1')
   Initialize-DynamicUpdateUI
-  $controls.LocalNavButton.Add_Click({$script:SkinManager.Controls.EnginePanel.Visibility='Collapsed'})
-  $controls.EngineNavButton.Add_Click({$script:SkinManager.Controls.EnginePanel.Visibility='Visible'})
+  $controls.ConfirmAcceptButton.Add_Click({Complete-DynamicManagerConfirmation $true})
+  $controls.ConfirmCancelButton.Add_Click({Complete-DynamicManagerConfirmation $false})
+  $controls.ConfirmCloseButton.Add_Click({Complete-DynamicManagerConfirmation $false})
+  $controls.LocalNavButton.Add_Click({Set-DynamicManagerSource Local})
+  $controls.EngineNavButton.Add_Click({Set-DynamicManagerSource WallpaperEngine})
   $controls.SettingsButton.Add_Click({$panel=$script:SkinManager.Controls.SettingsPanel;if($panel.Visibility -eq 'Visible'){$panel.Visibility='Collapsed'}else{$panel.Visibility='Visible'}})
   $controls.EngineImportButton.Add_Click({
     $ui=$script:SkinManager
-    if([Windows.MessageBox]::Show($ui.Window,'查找本机 Steam 库中的 Wallpaper Engine 壁纸并批量导入？原文件会保留。','导入本地壁纸','YesNo','Question') -eq 'Yes'){Start-DynamicManagerWork EngineImport}
+    Show-DynamicManagerConfirmation '导入本地壁纸？' '查找本机 Steam 库中的 Wallpaper Engine 视频和图片，批量导入并保留原文件。' {Start-DynamicManagerWork EngineImport} -AcceptText '确认导入'
   })
   $controls.EngineFolderButton.Add_Click({
     Add-Type -AssemblyName System.Windows.Forms
     $dialog=New-Object Windows.Forms.FolderBrowserDialog
-    $dialog.Description='选择包含 Wallpaper Engine 项目子文件夹的目录（如 431960 或 myprojects）'
+    $dialog.Description='选择 Wallpaper Engine 安装目录、壁纸父目录或单个项目目录；支持改名后的目录'
     try{if($dialog.ShowDialog() -eq 'OK'){Start-DynamicManagerWork EngineImport $dialog.SelectedPath}}finally{$dialog.Dispose()}
   })
   $controls.ClosePreviewButton.Add_Click({Close-DynamicCodexPreview})
-  $controls.PreviewApplyButton.Add_Click({Start-DynamicManagerWork Apply $script:SkinManager.Selected.Id})
+  $controls.PreviewApplyButton.Add_Click({Confirm-DynamicWallpaperApply})
   $controls.WallpaperList.Add_PreviewMouseLeftButtonUp({
     param($sender,$eventArgs)
     $element=$eventArgs.OriginalSource
@@ -364,7 +402,7 @@ function Show-DynamicSkinManager {
     if($element){$script:SkinManager.Controls.WallpaperList.SelectedItem=$element.Content;Show-DynamicCodexPreview}
   })
   $controls.WallpaperList.Add_KeyDown({param($sender,$eventArgs);if($eventArgs.Key -eq 'Return'){Show-DynamicCodexPreview}})
-  $window.Add_KeyDown({param($sender,$eventArgs);if($eventArgs.Key -eq 'Escape'){Close-DynamicCodexPreview;$script:SkinManager.Controls.SettingsPanel.Visibility='Collapsed'}})
+  $window.Add_KeyDown({param($sender,$eventArgs);if($eventArgs.Key -eq 'Escape'){if($script:SkinManager.Controls.ConfirmationOverlay.Visibility -eq 'Visible'){Complete-DynamicManagerConfirmation $false}else{Close-DynamicCodexPreview;$script:SkinManager.Controls.SettingsPanel.Visibility='Collapsed'}}})
   $window.Add_SizeChanged({if($script:SkinManager -and -not $script:SkinManager.Busy){Update-DynamicManagerList}})
   $controls.DetectButton.Add_Click({Start-DynamicManagerWork Refresh})
   $controls.WallpaperList.Add_SelectionChanged({Update-DynamicManagerSelection})
@@ -376,16 +414,16 @@ function Show-DynamicSkinManager {
     $dialog.Title='导入壁纸';$dialog.Filter='图片和视频|*.png;*.jpg;*.jpeg;*.webp;*.mp4;*.mov;*.m4v;*.wmv;*.avi;*.mkv;*.webm|静态图片|*.png;*.jpg;*.jpeg;*.webp|动态视频|*.mp4;*.mov;*.m4v;*.wmv;*.avi;*.mkv;*.webm'
     if($dialog.ShowDialog($script:SkinManager.Window)){Start-DynamicManagerWork Import $dialog.FileName}
   })
-  $controls.ApplyButton.Add_Click({Start-DynamicManagerWork Apply $script:SkinManager.Selected.Id})
+  $controls.ApplyButton.Add_Click({Confirm-DynamicWallpaperApply})
   $controls.RenameButton.Add_Click({Show-DynamicWallpaperRename})
   $controls.DeleteButton.Add_Click({
     $ui=$script:SkinManager
-    if([Windows.MessageBox]::Show($ui.Window,('删除“'+$ui.Selected.Name+'”？只会删除库中的副本，不会删除导入的原文件。'),'删除壁纸','YesNo','Warning') -eq 'Yes'){
-      Stop-DynamicManagerPreview;Start-DynamicManagerWork Delete $ui.Selected.Id
-    }
+    $id=$ui.Selected.Id
+    Show-DynamicManagerConfirmation -Title ('删除“'+$ui.Selected.Name+'”？') -Message '只删除库中的副本，原文件会保留。' -AcceptText '确认删除' -Action {Stop-DynamicManagerPreview;Start-DynamicManagerWork Delete $id}.GetNewClosure()
   })
   $controls.SaveCurrentButton.Add_Click({Start-DynamicManagerWork SaveCurrent})
-  $controls.OpenButton.Add_Click({Start-DynamicManagerWork Open})
+  $controls.OpenButton.Add_Click({Start-DynamicManagerWork Refresh})
+  $controls.OpenCodexButton.Add_Click({Start-DynamicManagerWork Open})
   $controls.RestoreButton.Add_Click({Start-DynamicManagerWork Restore})
   $controls.PlayButton.Add_Click({
     $ui=$script:SkinManager
@@ -402,6 +440,7 @@ function Show-DynamicSkinManager {
   try {Update-DynamicManagerButtons;$null=$window.ShowDialog()}
   finally {
     Stop-DynamicManagerPreview;$timer.Stop()
+    if($script:SkinManager.ToastTimer){$script:SkinManager.ToastTimer.Stop()}
     $script:SkinManager.UpdateTimer.Stop();$script:SkinManager.UpdateStartupTimer.Stop()
     if($script:SkinManager.UpdateWorker){$script:SkinManager.UpdateWorker.Stop();$script:SkinManager.UpdateWorker.Dispose()}
     if($script:SkinManager.UpdateRunspace){$script:SkinManager.UpdateRunspace.Dispose()}
@@ -422,4 +461,128 @@ function Show-DynamicCodexPreview {
 function Close-DynamicCodexPreview {
   Stop-DynamicManagerPreview
   $script:SkinManager.Controls.PreviewOverlay.Visibility='Collapsed'
+}
+
+function Move-DynamicSelectionThumb {
+  param($Transform,[ValidateSet('X','Y')][string]$Axis,[double]$To,[bool]$Animate=$true)
+  $property=[Windows.Media.TranslateTransform]::XProperty;if($Axis -eq 'Y'){$property=[Windows.Media.TranslateTransform]::YProperty}
+  $from=[double]$Transform.$Axis
+  if([math]::Abs($from-$To) -lt 0.01 -and -not $Transform.HasAnimatedProperties){return}
+  $Transform.BeginAnimation($property,$null);$Transform.$Axis=$To
+  if($Animate){
+    $animation=New-Object Windows.Media.Animation.DoubleAnimation
+    $animation.From=$from;$animation.To=$To;$animation.Duration=[timespan]::FromMilliseconds(240)
+    $ease=New-Object Windows.Media.Animation.CubicEase;$ease.EasingMode='EaseOut';$animation.EasingFunction=$ease
+    $Transform.BeginAnimation($property,$animation)
+  }
+}
+function Update-DynamicManagerFilterSlider {
+  param([bool]$Animate=$true)
+  $ui=$script:SkinManager
+  if(-not $ui.Controls.FilterThumbTransform){return}
+  $ui.Controls.FilterThumb.Visibility='Visible'
+  if($ui.Filter -eq 'All'){$ui.Controls.FilterThumb.Visibility='Collapsed';return}
+  $x=0;if($ui.Filter -eq 'Image'){$x=108}
+  if($ui.FilterTarget -ne $ui.Filter -or -not $Animate){Move-DynamicSelectionThumb $ui.Controls.FilterThumbTransform X $x $Animate}
+  $ui.FilterTarget=$ui.Filter
+}
+function Update-DynamicManagerNavigation {
+  param([bool]$Animate=$true)
+  $ui=$script:SkinManager
+  if(-not $ui.Controls.NavThumbTransform){return}
+  $engine=$ui.Source -eq 'WallpaperEngine'
+  $ui.Controls.LocalNavLabel.Visibility='Visible';$ui.Controls.EngineNavLabel.Visibility='Collapsed'
+  $ui.Controls.LocalNavIcon.Margin='0,0,12,0';$ui.Controls.EngineNavIcon.Margin='0'
+  $ui.Controls.EngineToolbar.Visibility='Collapsed';$ui.Controls.EnginePanel.Visibility='Collapsed'
+  $ui.Controls.ImportButton.Visibility='Visible'
+  $y=0
+  if($engine){
+    $y=80;$ui.Controls.LocalNavLabel.Visibility='Collapsed';$ui.Controls.EngineNavLabel.Visibility='Visible'
+    $ui.Controls.LocalNavIcon.Margin='0';$ui.Controls.EngineNavIcon.Margin='0,0,8,0'
+    $ui.Controls.EngineToolbar.Visibility='Visible';$ui.Controls.ImportButton.Visibility='Collapsed'
+    if(@(Get-DynamicVisibleWallpapers $ui.Items All WallpaperEngine).Count -eq 0){$ui.Controls.EnginePanel.Visibility='Visible';$ui.Controls.EmptyState.Visibility='Collapsed'}
+  }
+  if($ui.NavigationTarget -ne $ui.Source -or -not $Animate){Move-DynamicSelectionThumb $ui.Controls.NavThumbTransform Y $y $Animate}
+  $ui.NavigationTarget=$ui.Source
+}
+function Set-DynamicManagerSource {
+  param([ValidateSet('Local','WallpaperEngine')][string]$Source)
+  $ui=$script:SkinManager
+  if($ui.Busy){return}
+  Close-DynamicCodexPreview
+  if(-not $ui.SourceFilters){$ui.SourceFilters=@{}}
+  $ui.SourceFilters[$ui.Source]=$ui.Filter
+  $ui.Source=$Source
+  $ui.Filter='All'
+  if($ui.SourceFilters.ContainsKey($Source)){$ui.Filter=$ui.SourceFilters[$Source]}
+  else{
+    $kinds=@(Get-DynamicVisibleWallpapers $ui.Items All $Source|Select-Object -ExpandProperty Kind -Unique)
+    if($kinds.Count -eq 1 -and $kinds[0] -in @('Image','Video')){$ui.Filter=$kinds[0]}
+  }
+  Update-DynamicManagerList
+}
+function Update-DynamicManagerConnectionBadge {
+  $ui=$script:SkinManager
+  if(-not $ui.Controls.ConnectionBadge){return}
+  $ui.Controls.ConnectionBadge.Visibility='Visible'
+  $ui.Controls.ConnectionBadgeText.Text=[string][char]0x00d7
+  $color='#E25563'
+  if($ui.Connection.Connected){$color='#2CC17C';$ui.Controls.ConnectionBadgeText.Text=[string][char]0x2713}
+  $ui.Controls.ConnectionBadge.Background=[Windows.Media.BrushConverter]::new().ConvertFromString($color)
+  if($ui.Controls.ConnectionLabel){
+    $ui.Controls.ConnectionLabel.Text='连接失败';$ui.Controls.ConnectionDetail.Text='未找到Codex'
+    if($ui.Connection.Connected){$ui.Controls.ConnectionLabel.Text='连接成功';$ui.Controls.ConnectionDetail.Text='Codex '+$ui.Connection.Version}
+  }
+  $ui.Controls.OpenButton.ToolTip=$ui.Connection.Message+"`n单击重新检测"
+}
+function Set-DynamicConnectionChecking {
+  param([bool]$Checking)
+  $ui=$script:SkinManager
+  if(-not $ui.Controls.ConnectionLoading){return}
+  if($Checking){
+    $ui.Controls.ConnectionLoading.Visibility='Visible';$ui.Controls.ConnectionBadge.Visibility='Collapsed'
+    $ui.Controls.OpenButton.ToolTip='正在重新检测 Codex 连接…'
+    if($ui.Controls.ConnectionLabel){$ui.Controls.ConnectionLabel.Text='正在连接…';$ui.Controls.ConnectionDetail.Text='请稍候'}
+    $a=New-Object Windows.Media.Animation.DoubleAnimation 0,360,([Windows.Duration]::new([timespan]::FromSeconds(0.85)))
+    $a.RepeatBehavior=[Windows.Media.Animation.RepeatBehavior]::Forever
+    $ui.Controls.ConnectionSpinner.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty,$a)
+  }else{
+    $ui.Controls.ConnectionSpinner.BeginAnimation([Windows.Media.RotateTransform]::AngleProperty,$null)
+    $ui.Controls.ConnectionLoading.Visibility='Collapsed'
+    Update-DynamicManagerConnectionBadge
+  }
+}
+
+function Show-DynamicManagerConfirmation {
+  param([string]$Title,[string]$Message,[scriptblock]$Action,[scriptblock]$CancelAction,[string]$AcceptText='确认')
+  $ui=$script:SkinManager
+  if($ui.Busy){return}
+  $ui.ConfirmationAction=$Action;$ui.ConfirmationCancel=$CancelAction
+  $ui.Controls.ConfirmationTitle.Text=$Title;$ui.Controls.ConfirmationMessage.Text=$Message
+  $ui.Controls.ConfirmAcceptButton.Content=$AcceptText;$ui.Controls.ConfirmationOverlay.Visibility='Visible'
+}
+function Complete-DynamicManagerConfirmation {
+  param([bool]$Accepted)
+  $ui=$script:SkinManager
+  $action=$ui.ConfirmationCancel;if($Accepted){$action=$ui.ConfirmationAction}
+  $ui.ConfirmationAction=$null;$ui.ConfirmationCancel=$null;$ui.Controls.ConfirmationOverlay.Visibility='Collapsed'
+  if($action){& $action}
+}
+function Show-DynamicManagerToast {
+  param([string]$Message,[ValidateSet('Success','Error','Info')][string]$Kind='Success')
+  $ui=$script:SkinManager
+  $color='#2CC17C';$glyph=[string][char]0x2713
+  if($Kind -eq 'Error'){$color='#F03545';$glyph=[string][char]0x00d7}
+  if($Kind -eq 'Info'){$color='#657BEF';$glyph='i'}
+  $ui.Controls.ToastMessage.Text=$Message;$ui.Controls.ToastIcon.Text=$glyph
+  $ui.Controls.ToastIconBorder.Background=[Windows.Media.BrushConverter]::new().ConvertFromString($color)
+  $ui.Controls.ToastPanel.Visibility='Visible'
+  if(-not $ui.ToastTimer){$ui.ToastTimer=New-Object Windows.Threading.DispatcherTimer;$ui.ToastTimer.Interval=[timespan]::FromSeconds(5);$ui.ToastTimer.Add_Tick({$script:SkinManager.Controls.ToastPanel.Visibility='Collapsed';$script:SkinManager.ToastTimer.Stop()})}
+  $ui.ToastTimer.Stop();$ui.ToastTimer.Start()
+}
+function Confirm-DynamicWallpaperApply {
+  $ui=$script:SkinManager
+  if(-not $ui.Selected -or $ui.PrepareOnly -or $ui.Busy){return}
+  $id=$ui.Selected.Id
+  Show-DynamicManagerConfirmation -Title '应用这张壁纸？' -Message '保存当前工作后继续，可能需要重启 Codex。' -AcceptText '确认应用' -Action {Start-DynamicManagerWork Apply $id}.GetNewClosure()
 }
