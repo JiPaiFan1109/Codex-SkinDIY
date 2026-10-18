@@ -1,6 +1,8 @@
 ﻿# Local wallpaper storage. Call Initialize-DynamicMedia before using this module.
 if(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'wallpaper-preview.ps1')) { . (Join-Path $PSScriptRoot 'wallpaper-preview.ps1') }
 
+. (Join-Path $PSScriptRoot 'wallpaper-engine.ps1')
+
 function Get-DynamicWallpaperPaths {
   param([string]$StateRoot)
   $root = [IO.Path]::GetFullPath($StateRoot).TrimEnd('\')
@@ -135,6 +137,7 @@ function Complete-DynamicWallpaperImport {
     Move-Item -LiteralPath $Prepared.Path -Destination $destination
     # A prepared image is the media itself; no second full-size copy is retained.
     $entry=[ordered]@{schema='codex-dynamic-skin-wallpaper/1';id=$id;name=$displayName;kind=$Prepared.Kind;mediaFile=$mediaName;thumbnailFile='thumbnail.png';size=$Prepared.Size;sha256=$Prepared.Sha256;importedAtUtc=[datetime]::UtcNow.ToString('o')}
+    if($Prepared.SourceSha256){$entry.sourceSha256=$Prepared.SourceSha256}
     if(Get-Command New-DynamicWallpaperThumbnail -ErrorAction SilentlyContinue){
       if(-not (New-DynamicWallpaperThumbnail $destination $Prepared.Kind (Join-Path $directory 'thumbnail.png')) -and $Report){& $Report '媒体已保存，缩略图暂不可用。'}
     }
@@ -149,6 +152,20 @@ function Complete-DynamicWallpaperImport {
 function Import-DynamicWallpaper {
   param([string]$SourcePath,[ValidateSet('Image','Video')][string]$Kind,[string]$StateRoot,[scriptblock]$Report)
   $paths=Get-DynamicWallpaperPaths $StateRoot
+  Assert-DreamSkinNoReparseComponents -Path $SourcePath
+  $sourceInfo=Get-Item -LiteralPath $SourcePath -ErrorAction Stop
+  $sourceLimit=10MB;if($Kind -eq 'Video'){$sourceLimit=2GB}
+  if($sourceInfo.PSIsContainer -or $sourceInfo.Length -le 0 -or $sourceInfo.Length -gt $sourceLimit){throw '媒体大小超出导入限制。'}
+  $sourceHash=(Get-FileHash -LiteralPath $SourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  foreach($existing in Get-DynamicWallpaperItems $StateRoot){
+    if($existing.IsAvailable -and $existing.Kind -eq $Kind){
+      $metadata=Join-Path (Split-Path $existing.MediaPath) 'item.json'
+      $entry=[IO.File]::ReadAllText($metadata)|ConvertFrom-Json
+      if(($existing.Sha256 -eq $sourceHash -or $entry.sourceSha256 -eq $sourceHash) -and (Get-FileHash -LiteralPath $existing.MediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $existing.Sha256){
+        return [pscustomobject]@{Item=$existing;AlreadyExists=$true}
+      }
+    }
+  }
   $prepared=$null
   try {
     $prepared=New-DynamicPreparedMedia -SourcePath $SourcePath -Kind $Kind -StateRoot $StateRoot -PreparationRoot $paths.Staging -Report $Report

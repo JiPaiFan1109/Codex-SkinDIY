@@ -1,5 +1,15 @@
 ﻿. (Join-Path $PSScriptRoot 'app-update.ps1')
 
+function Show-DynamicUpdateNotice {
+  $ui=$script:SkinManager
+  if(-not $ui.AvailableUpdate){return}
+  $ui.Controls.UpdateText.Text='新版本 '+$ui.AvailableUpdate.version+'    当前版本：'+$ui.AppVersion
+  $ui.Controls.UpdateNotes.Text=$ui.AvailableUpdate.notes
+  $ui.Controls.UpdateBanner.Visibility='Visible'
+  $panel=$ui.Window.FindName('SettingsPanel')
+  if($panel){$panel.Visibility='Visible'}
+}
+
 function Start-DynamicUpdateWork {
   param([ValidateSet('Check','Download')][string]$Operation='Check',[switch]$Manual)
   $ui=$script:SkinManager
@@ -45,10 +55,8 @@ function Complete-DynamicUpdateWork {
       if($result.Manifest){$ui.AvailableUpdate=$result.Manifest}
       elseif($ui.UpdateManual){$ui.AvailableUpdate=$null}
       if($ui.AvailableUpdate){
-        $ui.Controls.UpdateBanner.Visibility='Visible'
-        $ui.Controls.UpdateText.Text='发现新版本 '+$ui.AvailableUpdate.version
-        $ui.Controls.UpdateNotes.Text=$ui.AvailableUpdate.notes
-      }elseif($ui.UpdateManual){$ui.Controls.UpdateText.Text='当前已是最新稳定版（'+$ui.AppVersion+'）。'}
+        Show-DynamicUpdateNotice
+      }elseif($ui.UpdateManual){$ui.Controls.UpdateBanner.Visibility='Collapsed';$ui.Controls.UpdateText.Text='当前已是最新稳定版（'+$ui.AppVersion+'）。'}
       else{$ui.Controls.UpdateText.Text='版本 '+$ui.AppVersion}
     }
   }catch{
@@ -86,7 +94,7 @@ function Initialize-DynamicUpdateUI {
   })
   $ui.Controls.InstallUpdateButton.Add_Click({
     $ui=$script:SkinManager
-    if([Windows.MessageBox]::Show($ui.Window,'将下载并安装新版，完成后重新打开管理中心。壁纸库会保留；安装时会短暂停止换肤后台，请勿同时应用壁纸。是否继续？','更新应用','YesNo','Question') -eq 'Yes'){Start-DynamicUpdateWork Download}
+    Start-DynamicUpdateWork Download
   })
   # Wait for the initial library refresh; automatic checking has its own worker and does not block editing.
   $startup=New-Object Windows.Threading.DispatcherTimer;$startup.Interval=[timespan]::FromSeconds(1)

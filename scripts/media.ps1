@@ -60,6 +60,20 @@ function Convert-DynamicVideo {
   $task.GetAwaiter().GetResult()
 }
 
+function Test-DynamicVideoDirectImport {
+  param([string]$Path)
+  if([IO.Path]::GetExtension($Path) -ine '.mp4' -or (Get-Item -LiteralPath $Path).Length -gt 128MB){return $false}
+  try {
+    Add-Type -AssemblyName System.Runtime.WindowsRuntime
+    $null=[Windows.Storage.StorageFile,Windows.Storage,ContentType=WindowsRuntime]
+    $null=[Windows.Media.MediaProperties.MediaEncodingProfile,Windows.Media,ContentType=WindowsRuntime]
+    $file=Wait-DynamicWinRT ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Path)) ([Windows.Storage.StorageFile])
+    $profile=Wait-DynamicWinRT ([Windows.Media.MediaProperties.MediaEncodingProfile]::CreateFromFileAsync($file)) ([Windows.Media.MediaProperties.MediaEncodingProfile])
+    $video=$profile.Video
+    return ($profile.Container.Subtype -eq 'MPEG4' -and $video.Subtype -eq 'H264' -and $video.Width -gt 0 -and $video.Width -le 1920 -and $video.Height -gt 0 -and $video.Height -le 1080 -and $video.FrameRate.Denominator -gt 0 -and ($video.FrameRate.Numerator/$video.FrameRate.Denominator) -le 60 -and ($null -eq $profile.Audio -or $profile.Audio.Subtype -eq 'AAC'))
+  }catch{return $false}
+}
+
 function New-DynamicPreparedMedia {
   param([Parameter(Mandatory)][string]$SourcePath, [ValidateSet('Image','Video')][string]$Kind, [Parameter(Mandatory)][string]$StateRoot, [scriptblock]$Report, [string]$PreparationRoot)
   $source = [IO.Path]::GetFullPath($SourcePath)
@@ -87,18 +101,22 @@ function New-DynamicPreparedMedia {
     $output = [IO.File]::Create($snapshot)
     try { $buffer = New-Object byte[] 65536; $total = 0L; while (($count = $inputStream.Read($buffer,0,$buffer.Length)) -gt 0) { $total += $count; if ($total -gt $limit) { throw '媒体超过大小限制。' }; $output.Write($buffer,0,$count) } } finally { $output.Dispose() }
   } finally { $inputStream.Dispose() }
+  $sourceSha256=(Get-FileHash -LiteralPath $snapshot -Algorithm SHA256).Hash.ToLowerInvariant()
   if ($Kind -eq 'Image') { Assert-DreamSkinImageFile -Path $snapshot; $ready = $snapshot; $preview = $snapshot }
   else {
     $ready = Join-Path $directory 'background.mp4'
-    Convert-DynamicVideo -SourcePath $snapshot -TargetPath $ready -Report $Report
+    if(Test-DynamicVideoDirectImport $snapshot){
+      if($Report){& $Report '视频格式兼容，快速保存，无需转码…'}
+      Move-Item -LiteralPath $snapshot -Destination $ready
+    }else{Convert-DynamicVideo -SourcePath $snapshot -TargetPath $ready -Report $Report}
     $preview = Join-Path $script:DynamicInstallRoot 'engine/assets/demo-background.png'
     Assert-DreamSkinImageFile -Path $preview
   }
   $length = (Get-Item -LiteralPath $ready).Length
   if ($Kind -eq 'Video') { $limit = 128MB }
   if ($length -le 0 -or $length -gt $limit) { throw '准备后的媒体超出大小限制（视频最大 128 MiB）。' }
-  if ($Kind -eq 'Video') { Remove-Item -LiteralPath $snapshot -Force }
-  return [pscustomobject]@{ Kind=$Kind; Path=$ready; Preview=$preview; Size=$length; Sha256=(Get-FileHash -LiteralPath $ready -Algorithm SHA256).Hash.ToLowerInvariant() }
+  if ($Kind -eq 'Video' -and (Test-Path -LiteralPath $snapshot)) { Remove-Item -LiteralPath $snapshot -Force }
+  return [pscustomobject]@{ Kind=$Kind; Path=$ready; Preview=$preview; Size=$length; SourceSha256=$sourceSha256; Sha256=(Get-FileHash -LiteralPath $ready -Algorithm SHA256).Hash.ToLowerInvariant() }
   } catch {
     $failure = $_
     Assert-DreamSkinNoReparseComponents -Path $directory

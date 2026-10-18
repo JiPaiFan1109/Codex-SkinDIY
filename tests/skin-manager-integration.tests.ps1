@@ -32,6 +32,10 @@ try{
             0 {Assert ($ui.Items.Count -eq 0) 'Fresh UI was not empty';Start-DynamicManagerWork Import (Join-Path $repo 'docs/images/earth-preview.png');$script:qa.Step=1}
             1 {
               Assert ($ui.Items.Count -eq 1 -and $ui.Selected.Kind -eq 'Image') 'Background import did not update cards'
+              Show-DynamicCodexPreview
+              Assert ($ui.Controls.PreviewOverlay.Visibility -eq 'Visible' -and $null -ne $ui.Controls.PreviewImage.Source) 'Codex preview did not open with selected image'
+              Close-DynamicCodexPreview
+              Assert ($ui.Controls.PreviewOverlay.Visibility -eq 'Collapsed') 'Preview did not close'
               $ui.Controls.ImageFilter.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
               Start-DynamicManagerWork Import (Join-Path $repo 'docs/media/earth-demo.mp4');$script:qa.Step=2
             }

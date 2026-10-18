@@ -20,9 +20,13 @@ try{
   $ui.Controls.UpdateBanner.Visibility='Visible'
   $ui.Controls.LaterUpdateButton.RaiseEvent((New-Object Windows.RoutedEventArgs ([Windows.Controls.Button]::ClickEvent)))
   if($ui.Controls.UpdateBanner.Visibility -ne 'Collapsed'){throw 'Later button did not dismiss the update'}
-  $ui.Controls.UpdateBanner.Visibility='Visible';$ui.Controls.UpdateText.Text='发现新版本 0.4.0'
-  $ui.Controls.UpdateNotes.Text="改进换肤体验，保留壁纸库与设置。`n自动下载并校验更新包，完成后重新打开管理中心。"
-  $visual=$window.Content;[Windows.Documents.TextElement]::SetForeground($visual,$window.Foreground);[Windows.Documents.TextElement]::SetFontFamily($visual,$window.FontFamily);$visual.Background=$window.Background;$window.Content=$null;$visual.Measure((New-Object Windows.Size(1180,860)));$visual.Arrange((New-Object Windows.Rect(0,0,1180,860)));$visual.UpdateLayout()
+  $ui.AvailableUpdate=[pscustomobject]@{version='1.0.0';notes="1.皮肤管理中心界面升级`n2.能够自动批量引入本地Wallpaper Engine壁纸"}
+  Show-DynamicUpdateNotice
+  if($ui.Controls.UpdateText.Text -notmatch '1.0.0' -or $ui.Controls.UpdateText.Text -notmatch '0.3.0'){throw 'Update notice must show candidate and installed versions'}
+  if($ui.Controls.UpdateNotes.Text -notmatch 'Wallpaper Engine'){throw 'Release highlights missing'}
+  if($window.FindName('SettingsPanel').Visibility -ne 'Visible'){throw 'Automatic update is hidden behind settings'}
+
+  $visual=$window.Content;$visual.Measure([Windows.Size]::new(1180,860));$visual.Arrange([Windows.Rect]::new(0,0,1180,860));$visual.UpdateLayout()
   if($ui.Controls.InstallUpdateButton.ActualWidth -le 0){throw 'Update action was not laid out'}
   if($ScreenshotPath){
     $bitmap=New-Object Windows.Media.Imaging.RenderTargetBitmap(1180,860,96,96,[Windows.Media.PixelFormats]::Pbgra32)

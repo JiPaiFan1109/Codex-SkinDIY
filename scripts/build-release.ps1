@@ -29,7 +29,7 @@ try {
     'VERSION','LICENSE','THIRD_PARTY_NOTICES.md','README.md','README.en.md','CHANGELOG.md','SECURITY.md','docs/earth-background.md','docs/images/wechat-donation.jpg','Install.cmd',
     'docs/images/app-icon.png','docs/images/skin-manager.png','docs/windows-application.md','docs/windows-application-validation.md','docs/pre-release-audit.md',
     'scripts/install.ps1','scripts/manage-background.ps1','scripts/media.ps1','scripts/node-runtime.json',
-    'scripts/wallpaper-library.ps1','scripts/wallpaper-preview.ps1','scripts/skin-manager.ps1','scripts/skin-manager.xaml',
+    'scripts/wallpaper-library.ps1','scripts/wallpaper-preview.ps1','scripts/wallpaper-engine.ps1','scripts/skin-manager.ps1','scripts/skin-manager.xaml',
     'scripts/manager-launcher.cs','scripts/uninstall-app.ps1','appearance/skin-manager.ico',
     'scripts/check-upgrade.ps1',
     'scripts/app-update.ps1','scripts/update-ui.ps1','scripts/finish-update.ps1','scripts/update-public-key.xml',

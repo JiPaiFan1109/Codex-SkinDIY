@@ -115,3 +115,7 @@ If this tool helps you, contributions support continued maintenance.
 <p align="center">
   <a href="docs/images/wechat-donation.jpg"><img src="docs/images/wechat-donation.jpg" alt="WeChat contribution QR code" width="316"></a>
 </p>
+
+### Version 1.0.0 candidate
+
+The redesigned gallery includes Codex appearance preview and automatic Wallpaper Engine video/image imports from Steam libraries. Scene, Web and application projects are not supported. Compatible H.264 MP4 files (up to 1080p/60fps and 128 MiB) are copied without transcoding; duplicates are detected before media preparation. Update notices show the installed version, new version and release highlights in the new visual style.
