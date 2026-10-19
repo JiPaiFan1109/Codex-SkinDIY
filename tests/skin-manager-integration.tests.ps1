@@ -96,7 +96,19 @@ try{
             }
             7 {
               Assert ($ui.Controls.ConnectionLoading.Visibility -eq 'Collapsed') 'Connection retry left spinner running'
-              $script:qa.Timer.Stop();$ui.Window.Close();$script:qa.Step=8
+              Start-DynamicManagerWork Import (Join-Path $repo 'engine/assets/demo-background.png');$script:qa.Step=8
+            }
+            8 {
+              $ids=@($ui.Controls.WallpaperList.ItemsSource|ForEach-Object {$_.Id})
+              Assert ($ids.Count -eq 2) 'Two image cards required for swap integration'
+              $script:qa.SwapFirst=$ids[0];$script:qa.SwapSecond=$ids[1]
+              Invoke-DynamicManagerCardSwap $ids[0] $ids[1];$script:qa.Step=9
+            }
+            9 {
+              $ids=@($ui.Controls.WallpaperList.ItemsSource|ForEach-Object {$_.Id})
+              Assert ($ids[0] -eq $script:qa.SwapSecond -and $ids[1] -eq $script:qa.SwapFirst) 'Worker swap did not update gallery'
+              Assert ($ui.Controls.PreviewOverlay.Visibility -eq 'Collapsed') 'Swap opened wallpaper preview'
+              $script:qa.Timer.Stop();$ui.Window.Close();$script:qa.Step=10
             }
           }
         }catch{
@@ -110,8 +122,8 @@ try{
   }
   Show-DynamicSkinManager -InstallRoot $repo -StateRoot $root -PrepareOnly
   if($script:qa.Error){throw $script:qa.Error}
-  Assert ($script:qa.Step -eq 8) 'UI closed before integration finished'
-  'PASS: WPF background import, selection, filtering, real H.264 playback, handle release, rename and delete'
+  Assert ($script:qa.Step -eq 10) 'UI closed before integration finished'
+  'PASS: WPF import, selection, filtering, playback, handle release, rename/delete, source navigation, connection retry and persisted worker swap'
 }finally{
   Set-Item Function:New-DynamicSkinManagerWindow $originalWindow
   if($script:qa.Timer){$script:qa.Timer.Stop()}

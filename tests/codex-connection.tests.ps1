@@ -21,5 +21,5 @@ Assert (-not $actions.Apply -and -not $actions.Open -and $actions.Import) 'Missi
 $actions=Get-DynamicManagerActionState $selected $status $false $false $true
 Assert ($actions.Apply -and $actions.Open) 'Detected Codex must enable engine actions'
 $window=New-DynamicSkinManagerWindow
-try {Assert ($null -ne $window.FindName('ConnectionText') -and $null -ne $window.FindName('OpenButton')) 'Connection status and retry controls are missing'}finally{$window.Close()}
+try {Assert ($null -ne $window.FindName('ConnectionDetail') -and $null -ne $window.FindName('OpenButton')) 'Connection status and retry controls are missing'}finally{$window.Close()}
 'PASS Codex detection, missing-package state, action gating and controls'

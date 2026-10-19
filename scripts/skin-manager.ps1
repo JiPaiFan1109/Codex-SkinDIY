@@ -103,7 +103,6 @@ namespace DynamicSkin {
   $window.FindName('MinimizeButton').Add_Click({$script:SkinManager.Window.WindowState='Minimized'})
   $window.FindName('MaximizeButton').Add_Click({Switch-DynamicManagerZoom $script:SkinManager.Window})
   $window.FindName('CloseWindowButton').Add_Click({$script:SkinManager.Window.Close()})
-  $window.FindName('TitleDragArea').Add_MouseLeftButtonDown({param($sender,$e);if($e.ClickCount -eq 2){Switch-DynamicManagerZoom $script:SkinManager.Window}else{$script:SkinManager.Window.DragMove()}})
   foreach($asset in @(@('EngineNavImage','wallpaper-engine.png'),@('ApplyIcon','apply-wallpaper.png'))){
     $path=Join-Path (Split-Path $PSScriptRoot -Parent) ('appearance/'+$asset[1])
     $frame=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$path,[Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat,[Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
@@ -286,6 +285,7 @@ function Start-DynamicManagerWork {
         if(-not $batch.Roots.Count){$message='未找到本地 Wallpaper Engine 壁纸，请选择壁纸目录。'}
         $engineReport=$message+"`n"+($batch.Details -join "`n")
       }
+      'Swap' {Switch-DynamicWallpaperOrder $StateRoot $Argument $Name;$selected=$Argument;$message='壁纸位置已交换。'}
       'Apply' {Use-DynamicWallpaper $StateRoot $Argument {Invoke-DynamicEngine -StateRoot $StateRoot}|Out-Null;$selected=$Argument;$message='壁纸已应用。'}
       'Rename' {Rename-DynamicWallpaper $StateRoot $Argument $Name|Out-Null;$selected=$Argument;$message='名称已保存。'}
       'Delete' {Remove-DynamicWallpaper $StateRoot $Argument;$message='壁纸已从库中删除。'}
@@ -327,10 +327,8 @@ function Complete-DynamicManagerWork {
     if(-not $result){throw '后台操作未返回结果。'}
     $ui.Items=@($result.Items);$ui.Status=$result.Status;$ui.Controls.StatusText.Text=$result.Message
     if($null -ne $result.EngineReport){$ui.Controls.EngineReport.Text=$result.EngineReport}
-    $ui.Connection=$result.Connection;$ui.Controls.ConnectionText.Text=$result.Connection.Message
+     $ui.Connection=$result.Connection
     Update-DynamicManagerConnectionBadge
-    $ui.Controls.ConnectionText.ToolTip=$result.Connection.Executable
-    if($result.Connection.Error){$ui.Controls.ConnectionText.ToolTip=$result.Connection.Error}
     if($result.SelectedId -and $ui.Filter -ne 'All'){
       $selected=@($ui.Items|Where-Object Id -eq $result.SelectedId)
       if($selected.Count -and $selected[0].Kind -ne $ui.Filter){$ui.Filter=$selected[0].Kind}
@@ -377,7 +375,7 @@ function Show-DynamicSkinManager {
   if([Threading.Thread]::CurrentThread.ApartmentState -ne 'STA'){throw '管理中心需要在 STA 模式下运行，请使用 powershell.exe -STA 启动。'}
   $window=New-DynamicSkinManagerWindow
   $controls=@{}
-  foreach($name in @('ImportButton','ImageFilter','VideoFilter','WallpaperList','EmptyState','EmptyTitle','PreviewPlaceholder','PreviewImage','PreviewVideo','PlayButton','SelectedName','SelectedDetails','SelectedFormat','SelectedSize','SelectedImportedAt','SelectedStatus','PreviewNotice','ApplyButton','RenameButton','DeleteButton','WorkProgress','StatusText','OpenButton','RestoreButton','ConnectionText')){$controls[$name]=$window.FindName($name)}
+  foreach($name in @('ImportButton','ImageFilter','VideoFilter','WallpaperList','EmptyState','EmptyTitle','PreviewPlaceholder','PreviewImage','PreviewVideo','PlayButton','SelectedName','SelectedDetails','SelectedFormat','SelectedSize','SelectedImportedAt','SelectedStatus','PreviewNotice','ApplyButton','RenameButton','DeleteButton','WorkProgress','StatusText','OpenButton','RestoreButton')){$controls[$name]=$window.FindName($name)}
   foreach($name in @('LocalNavButton','EngineNavButton','EngineImportButton','EngineFolderButton','EnginePanel','EngineReport','SettingsButton','SettingsPanel','PreviewOverlay','ClosePreviewButton','PreviewApplyButton','EngineToolbar','LocalNavLabel','EngineNavLabel','LocalNavIcon','EngineNavIcon','NavThumbTransform','FilterThumb','FilterThumbTransform','ConnectionBadge','ConnectionBadgeText','ConnectionLoading','ConnectionSpinner')){$controls[$name]=$window.FindName($name)}
   foreach($name in @('ConnectionLabel','ConnectionDetail','ConfirmationOverlay','ConfirmationTitle','ConfirmationMessage','ConfirmAcceptButton','ConfirmCancelButton','ConfirmCloseButton','ToastPanel','ToastIcon','ToastIconBorder','ToastMessage')){$controls[$name]=$window.FindName($name)}
   $script:SkinManager=@{Window=$window;Controls=$controls;InstallRoot=$InstallRoot;StateRoot=$StateRoot;ModuleRoot=$PSScriptRoot;PrepareOnly=[bool]$PrepareOnly;Items=@();Status=[pscustomobject]@{CurrentId=$null;Paused=$false;HasExternalCurrent=$false;Error=$null};Selected=$null;Source='Local';Filter='All';Busy=$false;Playing=$false;PromptShown=$false;Worker=$null;Runspace=$null;Async=$null}
@@ -403,12 +401,7 @@ function Show-DynamicSkinManager {
   })
   $controls.ClosePreviewButton.Add_Click({Close-DynamicCodexPreview})
   $controls.PreviewApplyButton.Add_Click({Confirm-DynamicWallpaperApply})
-  $controls.WallpaperList.Add_PreviewMouseLeftButtonUp({
-    param($sender,$eventArgs)
-    $element=$eventArgs.OriginalSource
-    while($element -and $element -isnot [Windows.Controls.ListBoxItem]){try{$element=[Windows.Media.VisualTreeHelper]::GetParent($element)}catch{$element=$null}}
-    if($element){$script:SkinManager.Controls.WallpaperList.SelectedItem=$element.Content;Show-DynamicCodexPreview}
-  })
+  Initialize-DynamicManagerDrag
   $controls.WallpaperList.Add_KeyDown({param($sender,$eventArgs);if($eventArgs.Key -eq 'Return'){Show-DynamicCodexPreview}})
   $window.Add_KeyDown({param($sender,$eventArgs);if($eventArgs.Key -eq 'Escape'){if($script:SkinManager.Controls.ConfirmationOverlay.Visibility -eq 'Visible'){Complete-DynamicManagerConfirmation $false}else{Close-DynamicCodexPreview;$script:SkinManager.Controls.SettingsPanel.Visibility='Collapsed'}}})
   $controls.WallpaperList.Add_SelectionChanged({Update-DynamicManagerSelection})
@@ -604,4 +597,91 @@ function Switch-DynamicManagerZoom {
     $Window.Width=$width;$Window.Height=$width*7/12
     $Window.Left=$area.Left+($area.Width-$Window.Width)/2;$Window.Top=$area.Top+($area.Height-$Window.Height)/2
   }
+}
+
+function Get-DynamicDragRegion {
+  param($Element)
+  while($null -ne $Element){
+    if($Element -is [Windows.Controls.ListBoxItem]){return [pscustomobject]@{Kind='Card';Card=$Element}}
+    if($Element -is [Windows.FrameworkElement] -and $Element.Name -eq 'GalleryRegion'){return [pscustomobject]@{Kind='Excluded';Card=$null}}
+    if($Element -is [Windows.Controls.ListBox] -or $Element -is [Windows.Controls.Primitives.Thumb] -or $Element -is [Windows.Controls.Primitives.TextBoxBase] -or $Element -is [Windows.Controls.Primitives.ScrollBar]){return [pscustomobject]@{Kind='Excluded';Card=$null}}
+    try{$Element=[Windows.Media.VisualTreeHelper]::GetParent($Element)}catch{$Element=[Windows.LogicalTreeHelper]::GetParent($Element)}
+  }
+  [pscustomobject]@{Kind='Window';Card=$null}
+}
+function Test-DynamicLongDrag {
+  param([double]$ElapsedMilliseconds,[double]$DeltaX,[double]$DeltaY)
+  return ($ElapsedMilliseconds -ge 350 -and ($DeltaX*$DeltaX+$DeltaY*$DeltaY) -ge 36)
+}
+function Invoke-DynamicManagerCardSwap {
+  param([string]$FirstId,[string]$SecondId)
+  $ui=$script:SkinManager
+  if($ui.Busy -or $FirstId -eq $SecondId){return}
+  $visible=@($ui.Controls.WallpaperList.ItemsSource|ForEach-Object {$_.Id})
+  if($visible -notcontains $FirstId -or $visible -notcontains $SecondId){return}
+  Start-DynamicManagerWork Swap $FirstId $SecondId
+}
+function Initialize-DynamicManagerDrag {
+  $ui=$script:SkinManager;$window=$ui.Window;$list=$ui.Controls.WallpaperList
+  $list.AllowDrop=$true
+  $window.Add_PreviewMouseLeftButtonDown({param($sender,$e)
+    $ui=$script:SkinManager
+    $region=Get-DynamicDragRegion $e.OriginalSource
+    $ui.DragGesture=$null;$ui.SuppressPreview=$false
+    if($region.Kind -eq 'Excluded' -or ($region.Kind -eq 'Card' -and $ui.Busy)){return}
+    $point=$e.GetPosition($ui.Window)
+    $ui.DragGesture=@{Region=$region;Point=$point;ScreenPoint=$ui.Window.PointToScreen($point);Left=$ui.Window.Left;Top=$ui.Window.Top;Moving=$false;Watch=[Diagnostics.Stopwatch]::StartNew()}
+  })
+  $window.Add_PreviewMouseMove({param($sender,$e)
+    $ui=$script:SkinManager;$gesture=$ui.DragGesture
+    if(-not $gesture -or $e.LeftButton -ne 'Pressed'){return}
+    $point=$e.GetPosition($ui.Window)
+    if(-not $gesture.Moving -and -not(Test-DynamicLongDrag $gesture.Watch.Elapsed.TotalMilliseconds ($point.X-$gesture.Point.X) ($point.Y-$gesture.Point.Y))){return}
+    $ui.SuppressPreview=$true;$e.Handled=$true
+    if($gesture.Region.Kind -eq 'Window'){
+      $screenPoint=$ui.Window.PointToScreen($point)
+      if(-not $gesture.Moving){
+        # Capture cancels a pressed button and keeps movement routed to this window.
+        $gesture.Moving=$true;[Windows.Input.Mouse]::Capture($ui.Window,[Windows.Input.CaptureMode]::SubTree)|Out-Null
+      }
+      $dpi=[Windows.Media.VisualTreeHelper]::GetDpi($ui.Window)
+      Move-DynamicWindowFromPointer $ui.Window $gesture $screenPoint $dpi.DpiScaleX $dpi.DpiScaleY
+    }else{
+      $ui.DragGesture=$null
+      [Windows.Input.Mouse]::Capture($null)|Out-Null
+      $card=$gesture.Region.Card
+      $ui.Controls.WallpaperList.SelectedItem=$card.Content
+      $data=New-Object Windows.DataObject
+      $data.SetData('CodexWallpaperId',[string]$card.Content.Id)
+      $card.Opacity=0.6
+      try{[Windows.DragDrop]::DoDragDrop($card,$data,[Windows.DragDropEffects]::Move)|Out-Null}finally{$card.Opacity=1}
+    }
+  })
+  $window.Add_PreviewMouseLeftButtonUp({param($sender,$e)
+    $ui=$script:SkinManager
+    if($ui.DragGesture -and $ui.DragGesture.Moving){[Windows.Input.Mouse]::Capture($null)|Out-Null}
+    $ui.DragGesture=$null
+    if($ui.SuppressPreview){$e.Handled=$true;$ui.SuppressPreview=$false;return}
+    $region=Get-DynamicDragRegion $e.OriginalSource
+    if($region.Kind -eq 'Card'){$ui.Controls.WallpaperList.SelectedItem=$region.Card.Content;Show-DynamicCodexPreview}
+  })
+  $window.Add_Deactivated({if($script:SkinManager){if($script:SkinManager.DragGesture -and $script:SkinManager.DragGesture.Moving){[Windows.Input.Mouse]::Capture($null)|Out-Null};$script:SkinManager.DragGesture=$null}})
+  $list.Add_DragOver({param($sender,$e)
+    $region=Get-DynamicDragRegion $e.OriginalSource
+    $e.Effects=[Windows.DragDropEffects]::None
+    if(-not $script:SkinManager.Busy -and $region.Kind -eq 'Card' -and $e.Data.GetDataPresent('CodexWallpaperId')){$e.Effects=[Windows.DragDropEffects]::Move}
+    $e.Handled=$true
+  })
+  $list.Add_Drop({param($sender,$e)
+    $ui=$script:SkinManager;$ui.SuppressPreview=$true;$ui.DragGesture=$null;$e.Handled=$true
+    $region=Get-DynamicDragRegion $e.OriginalSource
+    if($region.Kind -ne 'Card' -or -not $e.Data.GetDataPresent('CodexWallpaperId')){return}
+    try{Invoke-DynamicManagerCardSwap ([string]$e.Data.GetData('CodexWallpaperId')) ([string]$region.Card.Content.Id)}catch{Show-DynamicManagerToast ('交换失败：'+$_.Exception.Message) Error}
+  })
+}
+
+function Move-DynamicWindowFromPointer {
+  param($Window,$Gesture,$ScreenPoint,[double]$ScaleX,[double]$ScaleY)
+  $Window.Left=$Gesture.Left+($ScreenPoint.X-$Gesture.ScreenPoint.X)/$ScaleX
+  $Window.Top=$Gesture.Top+($ScreenPoint.Y-$Gesture.ScreenPoint.Y)/$ScaleY
 }

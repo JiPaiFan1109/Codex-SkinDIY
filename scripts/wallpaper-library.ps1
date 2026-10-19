@@ -98,13 +98,40 @@ function Get-DynamicWallpaperItem {
 function Get-DynamicWallpaperItems {
   param([string]$StateRoot)
   $paths=Get-DynamicWallpaperPaths $StateRoot
-  @(foreach($directory in Get-ChildItem -LiteralPath $paths.Items -Directory -Force){
+  $items=@(foreach($directory in Get-ChildItem -LiteralPath $paths.Items -Directory -Force){
     if($directory.Name -cmatch '^[0-9a-f]{32}$'){
       if(($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){
         [pscustomobject]@{Id=$directory.Name;Name='不可用壁纸';Kind='Unknown';MediaPath=$null;ThumbnailPath=$null;Size=0;Sha256=$null;ImportedAtUtc=[datetime]::MinValue;IsAvailable=$false;Error='壁纸目录不能是重解析点。';DiskSize=0}
       } else {Read-DynamicWallpaperItem $directory.FullName $directory.Name}
     }
   }) | Sort-Object ImportedAtUtc -Descending
+  $orderFile=Join-Path $paths.Library 'order.json'
+  $ranks=@{}
+  if(Test-Path -LiteralPath $orderFile){
+    Assert-DreamSkinNoReparseComponents -Path $orderFile
+    try{
+      if((Get-Item -LiteralPath $orderFile).Length -le 1MB){
+        $saved=[IO.File]::ReadAllText($orderFile)|ConvertFrom-Json
+        foreach($id in @($saved.ids)){if($id -cmatch '^[0-9a-f]{32}$' -and -not $ranks.ContainsKey($id)){$ranks[$id]=$ranks.Count}}
+      }
+    }catch{}
+  }
+  @($items|Sort-Object @{Expression={if($ranks.ContainsKey($_.Id)){$ranks[$_.Id]}else{-1}}},@{Expression='ImportedAtUtc';Descending=$true})
+}
+
+function Switch-DynamicWallpaperOrder {
+  param([string]$StateRoot,[string]$FirstId,[string]$SecondId)
+  Invoke-DynamicWallpaperLock $StateRoot {
+    $items=@(Get-DynamicWallpaperItems $StateRoot)
+    $ids=@($items|ForEach-Object {$_.Id})
+    $first=[array]::IndexOf($ids,$FirstId);$second=[array]::IndexOf($ids,$SecondId)
+    if($first -lt 0 -or $second -lt 0){throw '壁纸已被移除，请刷新后重试。'}
+    if($first -eq $second){return}
+    $ids[$first]=$SecondId;$ids[$second]=$FirstId
+    $path=Join-Path (Get-DynamicWallpaperPaths $StateRoot).Library 'order.json'
+    Assert-DreamSkinNoReparseComponents -Path $path
+    Write-DreamSkinUtf8FileAtomically -Path $path -Content (@{schema=1;ids=$ids}|ConvertTo-Json)
+  }
 }
 
 function Rename-DynamicWallpaper {
