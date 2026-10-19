@@ -103,7 +103,7 @@ namespace DynamicSkin {
   $window.FindName('MinimizeButton').Add_Click({$script:SkinManager.Window.WindowState='Minimized'})
   $window.FindName('MaximizeButton').Add_Click({Switch-DynamicManagerZoom $script:SkinManager.Window})
   $window.FindName('CloseWindowButton').Add_Click({$script:SkinManager.Window.Close()})
-  foreach($asset in @(@('EngineNavImage','wallpaper-engine.png'),@('ApplyIcon','apply-wallpaper.png'))){
+  foreach($asset in @(@('EngineNavImage','wallpaper-engine.png'),@('ApplyIcon','apply-wallpaper.png'),@('ConfirmationIcon','confirmation-icon.png'))){
     $path=Join-Path (Split-Path $PSScriptRoot -Parent) ('appearance/'+$asset[1])
     $frame=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$path,[Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat,[Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
     $frame.Freeze();$window.FindName($asset[0]).Source=$frame
@@ -330,14 +330,14 @@ function Complete-DynamicManagerWork {
   $message=$null
   while($ui.Queue.TryDequeue([ref]$message)){$ui.Controls.StatusText.Text=$message}
   if(-not $ui.Async.IsCompleted){return}
-  $ui.Timer.Stop();$prompt=$false
+  $ui.Timer.Stop();$importReport=$null
   try {
     $results=$ui.Worker.EndInvoke($ui.Async)
     if($ui.Worker.HadErrors){throw $ui.Worker.Streams.Error[0].Exception}
     $result=$results|Select-Object -Last 1
     if(-not $result){throw '后台操作未返回结果。'}
     $ui.Items=@($result.Items);$ui.Status=$result.Status;$ui.Controls.StatusText.Text=$result.Message
-    if($null -ne $result.EngineReport){$ui.Controls.EngineReport.Text=$result.EngineReport}
+    if($null -ne $result.EngineReport){$importReport=$result.EngineReport;$ui.Controls.StatusText.Text='';$ui.Controls.StatusText.Visibility='Collapsed'}
      $ui.Connection=$result.Connection
     Update-DynamicManagerConnectionBadge
     if($result.SelectedId -and $ui.Filter -ne 'All'){
@@ -367,6 +367,7 @@ function Complete-DynamicManagerWork {
     $ui.Worker.Dispose();$ui.Runspace.Dispose();$ui.Worker=$null;$ui.Runspace=$null;$ui.Async=$null
     $ui.Busy=$false;$ui.Controls.WorkProgress.Visibility='Collapsed';Update-DynamicManagerButtons
   }
+  if($null -ne $importReport){Show-DynamicImportResult $importReport}
 }
 
 function Show-DynamicWallpaperRename {
@@ -388,8 +389,8 @@ function Show-DynamicSkinManager {
   $window=New-DynamicSkinManagerWindow
   $controls=@{}
   foreach($name in @('ImportButton','ImageFilter','VideoFilter','WallpaperList','EmptyState','EmptyTitle','PreviewPlaceholder','PreviewImage','PreviewVideo','PlayButton','SelectedName','SelectedDetails','SelectedFormat','SelectedSize','SelectedImportedAt','SelectedStatus','PreviewNotice','ApplyButton','RenameButton','DeleteButton','WorkProgress','StatusText','OpenButton','RestoreButton')){$controls[$name]=$window.FindName($name)}
-  foreach($name in @('LocalNavButton','EngineNavButton','EngineImportButton','EngineFolderButton','EnginePanel','EngineReport','SettingsButton','SettingsPanel','PreviewOverlay','ClosePreviewButton','PreviewApplyButton','EngineToolbar','LocalNavLabel','EngineNavLabel','LocalNavIcon','EngineNavIcon','NavThumbTransform','FilterThumb','FilterThumbTransform','ConnectionBadge','ConnectionBadgeText','ConnectionLoading','ConnectionSpinner')){$controls[$name]=$window.FindName($name)}
-  foreach($name in @('ConnectionLabel','ConnectionDetail','ConfirmationOverlay','ConfirmationTitle','ConfirmationMessage','ConfirmAcceptButton','ConfirmCancelButton','ConfirmCloseButton','ToastPanel','ToastIcon','ToastIconBorder','ToastMessage')){$controls[$name]=$window.FindName($name)}
+  foreach($name in @('LocalNavButton','EngineNavButton','EngineImportButton','EngineFolderButton','EnginePanel','SettingsButton','SettingsPanel','PreviewOverlay','ClosePreviewButton','PreviewApplyButton','EngineToolbar','LocalNavLabel','EngineNavLabel','LocalNavIcon','EngineNavIcon','NavThumbTransform','FilterThumb','FilterThumbTransform','ConnectionBadge','ConnectionBadgeText','ConnectionLoading','ConnectionSpinner')){$controls[$name]=$window.FindName($name)}
+  foreach($name in @('ConnectionLabel','ConnectionDetail','ConfirmationOverlay','ConfirmationTitle','ConfirmationMessage','ConfirmationScroll','ConfirmationCancelColumn','ConfirmationGapColumn','ConfirmAcceptButton','ConfirmCancelButton','ConfirmCloseButton','ToastPanel','ToastIcon','ToastIconBorder','ToastMessage')){$controls[$name]=$window.FindName($name)}
   $script:SkinManager=@{Window=$window;Controls=$controls;InstallRoot=$InstallRoot;StateRoot=$StateRoot;ModuleRoot=$PSScriptRoot;PrepareOnly=[bool]$PrepareOnly;Items=@();Status=[pscustomobject]@{CurrentId=$null;Paused=$false;HasExternalCurrent=$false;Error=$null};Selected=$null;Source='Local';Filter='All';Busy=$false;Playing=$false;PromptShown=$false;Worker=$null;Runspace=$null;Async=$null}
   $timer=New-Object Windows.Threading.DispatcherTimer;$timer.Interval=[timespan]::FromMilliseconds(120);$timer.Add_Tick({Complete-DynamicManagerWork});$script:SkinManager.Timer=$timer
   $script:SkinManager.Connection=[pscustomobject]@{Available=$false}
@@ -517,6 +518,7 @@ function Set-DynamicManagerSource {
   param([ValidateSet('Local','WallpaperEngine')][string]$Source)
   $ui=$script:SkinManager
   if($ui.Busy){return}
+
   Close-DynamicCodexPreview
   $ui.Source=$Source
   Update-DynamicManagerList
@@ -557,9 +559,23 @@ function Show-DynamicManagerConfirmation {
   param([string]$Title,[string]$Message,[scriptblock]$Action,[scriptblock]$CancelAction,[string]$AcceptText='确认')
   $ui=$script:SkinManager
   if($ui.Busy){return}
+  $ui.Controls.ConfirmCancelButton.Visibility='Visible'
+  $ui.Controls.ConfirmationCancelColumn.Width=[Windows.GridLength]::new(1,[Windows.GridUnitType]::Star)
+  $ui.Controls.ConfirmationGapColumn.Width=[Windows.GridLength]::new(12)
+  $ui.Controls.ConfirmationMessage.TextAlignment='Center'
   $ui.ConfirmationAction=$Action;$ui.ConfirmationCancel=$CancelAction
   $ui.Controls.ConfirmationTitle.Text=$Title;$ui.Controls.ConfirmationMessage.Text=$Message
   $ui.Controls.ConfirmAcceptButton.Content=$AcceptText;$ui.Controls.ConfirmationOverlay.Visibility='Visible'
+  $ui.Controls.ConfirmationScroll.ScrollToTop()
+}
+function Show-DynamicImportResult {
+  param([string]$Report)
+  $ui=$script:SkinManager
+  Show-DynamicManagerConfirmation -Title '壁纸导入结果' -Message $Report -Action {} -AcceptText '知道了'
+  $ui.Controls.ConfirmCancelButton.Visibility='Collapsed'
+  $ui.Controls.ConfirmationCancelColumn.Width=[Windows.GridLength]::new(0)
+  $ui.Controls.ConfirmationGapColumn.Width=[Windows.GridLength]::new(0)
+  $ui.Controls.ConfirmationMessage.TextAlignment='Left'
 }
 function Complete-DynamicManagerConfirmation {
   param([bool]$Accepted)
@@ -615,15 +631,22 @@ function Get-DynamicDragRegion {
   param($Element)
   while($null -ne $Element){
     if($Element -is [Windows.Controls.ListBoxItem]){return [pscustomobject]@{Kind='Card';Card=$Element}}
-    if($Element -is [Windows.FrameworkElement] -and $Element.Name -eq 'GalleryRegion'){return [pscustomobject]@{Kind='Excluded';Card=$null}}
-    if($Element -is [Windows.Controls.ListBox] -or $Element -is [Windows.Controls.Primitives.Thumb] -or $Element -is [Windows.Controls.Primitives.TextBoxBase] -or $Element -is [Windows.Controls.Primitives.ScrollBar]){return [pscustomobject]@{Kind='Excluded';Card=$null}}
-    try{$Element=[Windows.Media.VisualTreeHelper]::GetParent($Element)}catch{$Element=[Windows.LogicalTreeHelper]::GetParent($Element)}
+    if($Element -is [Windows.Controls.Primitives.Thumb] -or $Element -is [Windows.Controls.Primitives.TextBoxBase] -or $Element -is [Windows.Controls.Primitives.ScrollBar]){return [pscustomobject]@{Kind='Excluded';Card=$null}}
+    if($Element -is [Windows.Controls.Primitives.ButtonBase]){return [pscustomobject]@{Kind='Control';Card=$null}}
+    try{$parent=[Windows.Media.VisualTreeHelper]::GetParent($Element)}catch{$parent=$null};if(-not $parent){$parent=[Windows.LogicalTreeHelper]::GetParent($Element)};$Element=$parent
   }
   [pscustomobject]@{Kind='Window';Card=$null}
 }
 function Test-DynamicLongDrag {
   param([double]$ElapsedMilliseconds,[double]$DeltaX,[double]$DeltaY)
   return ($ElapsedMilliseconds -ge 350 -and ($DeltaX*$DeltaX+$DeltaY*$DeltaY) -ge 36)
+}
+function Test-DynamicWindowDrag {
+  param([string]$Kind,[double]$ElapsedMilliseconds,[double]$DeltaX,[double]$DeltaY)
+  $distance=$DeltaX*$DeltaX+$DeltaY*$DeltaY
+  if($Kind -eq 'Card'){return (Test-DynamicLongDrag $ElapsedMilliseconds $DeltaX $DeltaY)}
+  if($Kind -eq 'Control'){return ($ElapsedMilliseconds -ge 180 -and $distance -ge 16)}
+  return ($Kind -eq 'Window' -and $distance -ge 9)
 }
 function Invoke-DynamicManagerCardSwap {
   param([string]$FirstId,[string]$SecondId)
@@ -643,14 +666,15 @@ function Initialize-DynamicManagerDrag {
     if($region.Kind -eq 'Excluded' -or ($region.Kind -eq 'Card' -and $ui.Busy)){return}
     $point=$e.GetPosition($ui.Window)
     $ui.DragGesture=@{Region=$region;Point=$point;ScreenPoint=$ui.Window.PointToScreen($point);Left=$ui.Window.Left;Top=$ui.Window.Top;Moving=$false;Watch=[Diagnostics.Stopwatch]::StartNew()}
+    if($region.Kind -eq 'Window'){[Windows.Input.Mouse]::Capture($ui.Window,[Windows.Input.CaptureMode]::SubTree)|Out-Null;$e.Handled=$true}
   })
   $window.Add_PreviewMouseMove({param($sender,$e)
     $ui=$script:SkinManager;$gesture=$ui.DragGesture
     if(-not $gesture -or $e.LeftButton -ne 'Pressed'){return}
     $point=$e.GetPosition($ui.Window)
-    if(-not $gesture.Moving -and -not(Test-DynamicLongDrag $gesture.Watch.Elapsed.TotalMilliseconds ($point.X-$gesture.Point.X) ($point.Y-$gesture.Point.Y))){return}
+    if(-not $gesture.Moving -and -not(Test-DynamicWindowDrag $gesture.Region.Kind $gesture.Watch.Elapsed.TotalMilliseconds ($point.X-$gesture.Point.X) ($point.Y-$gesture.Point.Y))){return}
     $ui.SuppressPreview=$true;$e.Handled=$true
-    if($gesture.Region.Kind -eq 'Window'){
+    if($gesture.Region.Kind -in @('Window','Control')){
       $screenPoint=$ui.Window.PointToScreen($point)
       if(-not $gesture.Moving){
         # Capture cancels a pressed button and keeps movement routed to this window.
@@ -671,13 +695,13 @@ function Initialize-DynamicManagerDrag {
   })
   $window.Add_PreviewMouseLeftButtonUp({param($sender,$e)
     $ui=$script:SkinManager
-    if($ui.DragGesture -and $ui.DragGesture.Moving){[Windows.Input.Mouse]::Capture($null)|Out-Null}
+    if($ui.DragGesture -and ($ui.DragGesture.Moving -or $ui.DragGesture.Region.Kind -eq 'Window')){[Windows.Input.Mouse]::Capture($null)|Out-Null}
     $ui.DragGesture=$null
     if($ui.SuppressPreview){$e.Handled=$true;$ui.SuppressPreview=$false;return}
     $region=Get-DynamicDragRegion $e.OriginalSource
     if($region.Kind -eq 'Card'){$ui.Controls.WallpaperList.SelectedItem=$region.Card.Content;Show-DynamicCodexPreview}
   })
-  $window.Add_Deactivated({if($script:SkinManager){if($script:SkinManager.DragGesture -and $script:SkinManager.DragGesture.Moving){[Windows.Input.Mouse]::Capture($null)|Out-Null};$script:SkinManager.DragGesture=$null}})
+  $window.Add_Deactivated({if($script:SkinManager){if($script:SkinManager.DragGesture -and ($script:SkinManager.DragGesture.Moving -or $script:SkinManager.DragGesture.Region.Kind -eq 'Window')){[Windows.Input.Mouse]::Capture($null)|Out-Null};$script:SkinManager.DragGesture=$null}})
   $list.Add_DragOver({param($sender,$e)
     $region=Get-DynamicDragRegion $e.OriginalSource
     $e.Effects=[Windows.DragDropEffects]::None

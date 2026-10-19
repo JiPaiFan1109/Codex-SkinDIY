@@ -6,7 +6,7 @@ $root=Join-Path ([IO.Path]::GetTempPath()) ('media-restore-'+[guid]::NewGuid().T
 try{
   $scripts=Join-Path $root 'CodexDynamicSkin/engine/scripts'
   [IO.Directory]::CreateDirectory($scripts)|Out-Null
-  Copy-Item -LiteralPath (Join-Path $repo 'engine/scripts/common-windows.ps1'),(Join-Path $repo 'engine/scripts/config-utf8.ps1') -Destination $scripts
+  Copy-Item -LiteralPath (Join-Path $repo 'engine/scripts/common-windows.ps1'),(Join-Path $repo 'engine/scripts/config-utf8.ps1'),(Join-Path $repo 'engine/scripts/loopback-http.ps1') -Destination $scripts
   [IO.File]::WriteAllText((Join-Path $scripts 'restore-dream-skin.ps1'),@'
 param([switch]$PromptRestart,[string]$ResultToken)
 $ErrorActionPreference='Stop'

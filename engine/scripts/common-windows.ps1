@@ -1,4 +1,5 @@
-﻿. (Join-Path $PSScriptRoot 'config-utf8.ps1')
+﻿. (Join-Path $PSScriptRoot 'loopback-http.ps1')
+. (Join-Path $PSScriptRoot 'config-utf8.ps1')
 
 $script:DreamSkinStartResultCategories = @(
   'none',
@@ -697,7 +698,7 @@ function Start-DreamSkinCodexForDebugging {
   }
   $packageProcessId = Start-DreamSkinCodex -Codex $Codex -Arguments $Arguments
   $packageStatus = Wait-DreamSkinCodexDebugArgumentStatus -Codex $Codex -Port $Port
-  if ($packageStatus -ne 'protocol-redirected') {
+  if ($packageStatus -notin @('protocol-redirected','not-forwarded')) {
     return [pscustomobject]@{
       ProcessId = $packageProcessId
       Strategy = 'package-activation'
@@ -724,7 +725,7 @@ function Start-DreamSkinCodexForDebugging {
       'cdp-launch-failed'
     }
     throw (New-DreamSkinStartException -Category $category `
-      -Message "Codex $($Codex.Version) converted the CDP argument into a codex:// navigation path. Direct launch of the validated Store executable failed ($failureKind), so this Codex/Windows combination cannot expose the Dream Skin debugging endpoint without modifying the protected app package." `
+      -Message "Codex $($Codex.Version) did not retain the CDP argument during package activation. Direct launch of the validated Store executable failed ($failureKind), so this Codex/Windows combination cannot expose the Dream Skin debugging endpoint without modifying the protected app package." `
       -InnerException $_.Exception)
   }
 
@@ -844,8 +845,7 @@ function Test-DreamSkinCdpPageTarget {
 function Get-DreamSkinCdpTargets {
   param([int]$Port)
   try {
-    $targets = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/list" -TimeoutSec 2 `
-      -MaximumRedirection 0 -ErrorAction Stop
+    $targets = Invoke-DreamSkinLoopbackJson -Port $Port -Resource '/json/list'
     return @($targets | Where-Object { Test-DreamSkinCdpPageTarget -Target $_ -Port $Port })
   } catch {
     return @()
@@ -860,8 +860,7 @@ function Test-DreamSkinBrowserId {
 function Get-DreamSkinCdpBrowserIdentity {
   param([int]$Port)
   try {
-    $version = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/version" -TimeoutSec 2 `
-      -MaximumRedirection 0 -ErrorAction Stop
+    $version = Invoke-DreamSkinLoopbackJson -Port $Port -Resource '/json/version'
     $webSocketUrl = "$($version.webSocketDebuggerUrl)"
     if (-not (Test-DreamSkinWebSocketUrl -Value $webSocketUrl -Port $Port)) { return $null }
     $uri = [Uri]$webSocketUrl

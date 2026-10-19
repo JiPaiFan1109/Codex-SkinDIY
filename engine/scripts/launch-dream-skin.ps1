@@ -1,6 +1,7 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'loopback-http.ps1')
 
 function Test-DynamicPathEqual {
   param([string]$Left,[string]$Right)
@@ -101,7 +102,7 @@ function Invoke-DynamicQuickLauncher {
     $state=[IO.File]::ReadAllText($statePath)|ConvertFrom-Json -ErrorAction Stop
     $port=[int]$state.port
     if($port-lt1024 -or $port-gt65535){throw 'Invalid port'}
-    $version=Invoke-RestMethod -Uri "http://127.0.0.1:$port/json/version" -TimeoutSec 1 -MaximumRedirection 0 -ErrorAction Stop
+    $version=Invoke-DreamSkinLoopbackJson -Port $port -Resource '/json/version' -TimeoutMilliseconds 1000
     $uri=[Uri]"$($version.webSocketDebuggerUrl)"
     $match=[regex]::Match($uri.AbsolutePath,'^/devtools/browser/(?<id>[A-Za-z0-9._-]{1,200})$')
     if($uri.Scheme-ne'ws' -or $uri.Host-ne'127.0.0.1' -or $uri.Port-ne$port -or -not$match.Success){throw 'Endpoint identity mismatch'}

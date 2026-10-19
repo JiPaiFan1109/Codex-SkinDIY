@@ -88,12 +88,12 @@ try {
   $coexistingProfiles = @($openingInstances.Managed).Count -gt 0 -and -not $openingInstances.IsExclusive
   $fastState = $null
   if (-not $PortExplicit -and -not $ProfilePathExplicit -and -not $ForegroundInjector -and
-      -not $RestartExisting -and -not $ResultToken -and -not $coexistingProfiles) {
+      -not $RestartExisting -and -not $coexistingProfiles) {
     $fastState = Get-DreamSkinFastResumeCandidate -StateRoot $StateRoot -Codex $currentCodex
   }
   if ($null -ne $fastState) {
     $fastArguments = @('--remote-debugging-address=127.0.0.1', "--remote-debugging-port=$($fastState.port)", "--user-data-dir=$($fastState.profilePath)")
-    $null = Start-DreamSkinCodex -Codex $currentCodex -Arguments $fastArguments
+    if(-not $ResultToken){$null = Start-DreamSkinCodex -Codex $currentCodex -Arguments $fastArguments}
     Write-Host ('Existing window opened after {0:N2} seconds; checking playback...' -f $startupTimer.Elapsed.TotalSeconds)
   } elseif (-not $PortExplicit -and -not $ProfilePathExplicit -and -not $ForegroundInjector -and
             -not $RestartExisting -and -not $ResultToken -and -not $coexistingProfiles) {
@@ -111,13 +111,20 @@ try {
   if ($null -ne $fastState) {
     $fastIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $fastState.port -Codex $currentCodex
     if ($null -ne $fastIdentity -and $fastIdentity.BrowserId -ceq $fastState.browserId) {
-      $fastVerify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
-        $Injector, '--verify', '--port', "$($fastState.port)", '--browser-id', $fastState.browserId,
-        '--theme-dir', $fastState.themeDir, '--video-state', $fastState.videoReadyPath, '--timeout-ms', '3000'
-      )
-      if ($fastVerify.ExitCode -eq 0) {
+      # Apply requests must install and verify the new revision; a plain open
+      # only checks the existing revision. Keep the live watcher and services.
+      $fastMode=if($ResultToken){'--once'}else{'--verify'}
+      $fastArguments=@($Injector,$fastMode,'--port',"$($fastState.port)",'--browser-id',$fastState.browserId,
+        '--theme-dir',$fastState.themeDir,'--timeout-ms','3000')
+      if($fastState.videoPid){$fastArguments += @('--video-state',$fastState.videoReadyPath)}
+      if($ResultToken){$fastArguments += '--silent-ui'}
+      $fastVerify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList $fastArguments
+      $stillRunning=Get-DreamSkinFastResumeCandidate -StateRoot $StateRoot -Codex $currentCodex
+      if ($fastVerify.ExitCode -eq 0 -and $null -ne $stillRunning -and
+          $stillRunning.browserId -ceq $fastState.browserId) {
         Write-DreamSkinUtf8FileAtomically -Path (Join-Path $StateRoot 'verify.log') -Content (($fastVerify.Output -join "`r`n") + "`r`n")
         Write-Host ('Earth background resumed and verified in {0:N2} seconds. Existing services were preserved.' -f $startupTimer.Elapsed.TotalSeconds)
+        if($ResultToken){Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken -Outcome success -Category none -AppearanceRecovery retained}
         exit 0
       }
     }
@@ -229,6 +236,16 @@ try {
     # then the pending appearance transaction is recovered before relaunch.
     $appearanceRecovery = 'blocked'
     $cdpIdentity = $null
+  }
+  # A managed process can exist before its first page exposes CDP. Give that
+  # startup a bounded chance to finish before offering a disruptive restart.
+  if($null -eq $cdpIdentity -and -not $pendingAppearanceTransaction -and
+     @($currentInstances.Managed).Count -gt 0 -and $currentInstances.IsExclusive){
+    $endpointDeadline=[datetime]::UtcNow.AddSeconds(4)
+    do {
+      Start-Sleep -Milliseconds 200
+      $cdpIdentity=Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
+    } while($null -eq $cdpIdentity -and [datetime]::UtcNow -lt $endpointDeadline)
   }
   $debugReady = $null -ne $cdpIdentity
   $codexProcesses = if (Test-DreamSkinPathEqual -Left $codexToStop.Executable -Right $currentCodex.Executable) {

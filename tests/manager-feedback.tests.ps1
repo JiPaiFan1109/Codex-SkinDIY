@@ -21,6 +21,14 @@ try{
  Complete-DynamicManagerConfirmation $true
  Complete-DynamicManagerConfirmation $true
  Assert ($script:applied -eq 1) 'Confirmation did not execute exactly once'
+ Show-DynamicImportResult "Imported 2; skipped 1"
+ Assert ($controls.ConfirmCancelButton.Visibility -eq 'Collapsed' -and $controls.ConfirmAcceptButton.Content -eq '知道了') 'Import result must be acknowledgement only'
+ Assert ($null -eq $w.FindName('EngineReport')) 'Import results still occupy gallery'
+ Complete-DynamicManagerConfirmation $true
+ Assert ($controls.ConfirmationOverlay.Visibility -eq 'Collapsed') 'Import acknowledgement did not dismiss result'
+ Show-DynamicManagerConfirmation 'Apply?' 'Confirm first' {}
+ Assert ($controls.ConfirmCancelButton.Visibility -eq 'Visible') 'Import result broke later confirmation buttons'
+ Complete-DynamicManagerConfirmation $false
  Show-DynamicManagerToast 'Done' Success
  Assert ($controls.ToastPanel.Visibility -eq 'Visible' -and $controls.ToastMessage.Text -eq 'Done') 'Success toast not visible'
  Show-DynamicManagerToast 'Failed' Error
