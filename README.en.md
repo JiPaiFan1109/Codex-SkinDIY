@@ -18,10 +18,10 @@ A community tool, **not an official OpenAI product or affiliated with OpenAI**. 
 ## Interface and features
 
 <p align="center">
-  <img src="docs/images/skin-manager.png" width="1100" alt="Codex Skin Manager: wallpaper gallery, video preview, apply controls, and local Codex detection">
+  <img src="docs/images/skin-manager.png" width="1100" alt="New Codex Skin Manager: a full gallery of 12 sample wallpapers in 3 rows and 4 columns">
 </p>
 
-New manager interface: image/video library, playback preview, wallpaper controls, and appearance restoration. [View full screenshot](docs/images/skin-manager.png).
+New manager illustration: 12 sample wallpapers fill a 3-row, 4-column gallery. Sample artwork is for illustration and is not bundled as preset wallpapers. [View full screenshot](docs/images/skin-manager.png).
 
 - **Images and videos:** import local files and use them as Codex backgrounds.
 - **Wallpaper library:** card gallery, image/video filters, large previews, silent video playback, renaming, and deletion.

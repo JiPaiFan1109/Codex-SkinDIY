@@ -18,10 +18,10 @@
 ## 界面与功能
 
 <p align="center">
-  <img src="docs/images/skin-manager.png" width="1100" alt="Codex 换肤管理中心：壁纸画廊、视频预览、应用操作与本机 Codex 检测状态">
+  <img src="docs/images/skin-manager.png" width="1100" alt="Codex 新版换肤管理中心：3 行 4 列、12 张示例壁纸的完整画廊">
 </p>
 
-新版管理中心界面：图片与视频壁纸库、播放预览、应用壁纸和恢复原始外观。[查看完整截图](docs/images/skin-manager.png)。
+新版管理中心示意图：以 3 行 × 4 列展示 12 张示例壁纸，呈现完整画廊布局（示例素材不随软件预置）。[查看完整截图](docs/images/skin-manager.png)。
 
 - **Wallpaper Engine 导入**：左侧入口自动发现 Steam 库，批量复制视频/图片项目；Scene、Web、应用项目暂不支持。
 - **静态与动态背景**：导入本地图片或视频，为 Codex 更换背景。
