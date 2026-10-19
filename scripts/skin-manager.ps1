@@ -118,7 +118,7 @@ namespace DynamicSkin {
     })
   }
   $area=[Windows.SystemParameters]::WorkArea
-  $window.Width=[Math]::Max(900,[Math]::Min(1440,[Math]::Min($area.Width-32,($area.Height-32)*12/7)))
+  $window.Width=[Math]::Max(900,[Math]::Min(1440,[Math]::Min($area.Width*0.85,$area.Height*0.85*12/7)))
   $window.Height=$window.Width*7/12
   return $window
 }
@@ -135,6 +135,14 @@ function Read-DynamicManagerBitmap {
   if(-not $Path){return $null}
   try {
     Assert-DreamSkinNoReparseComponents -Path $Path
+    $cache=$null;$key=$null
+    if($script:SkinManager){
+      if(-not $script:SkinManager.BitmapCache){$script:SkinManager.BitmapCache=@{}}
+      $cache=$script:SkinManager.BitmapCache
+      $file=Get-Item -LiteralPath $Path -ErrorAction Stop
+      $key=$file.FullName+'|'+$file.Length+'|'+$file.LastWriteTimeUtc.Ticks+'|'+$DecodeWidth
+      if($cache.ContainsKey($key)){return $cache[$key]}
+    }
     if([IO.Path]::GetExtension($Path) -ieq '.ico'){
       $decoder=[Windows.Media.Imaging.BitmapDecoder]::Create([uri][IO.Path]::GetFullPath($Path),[Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat,[Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
       $frame=$decoder.Frames|Sort-Object PixelWidth -Descending|Select-Object -First 1
@@ -144,6 +152,7 @@ function Read-DynamicManagerBitmap {
     $bitmap.BeginInit();$bitmap.CacheOption=[Windows.Media.Imaging.BitmapCacheOption]::OnLoad
     $bitmap.UriSource=[uri][IO.Path]::GetFullPath($Path);$bitmap.DecodePixelWidth=$DecodeWidth
     $bitmap.EndInit();$bitmap.Freeze()
+    if($cache -ne $null){if($cache.Count -ge 64){$cache.Clear()};$cache[$key]=$bitmap}
     return $bitmap
   }catch{return $null}
 }
@@ -199,7 +208,9 @@ function Update-DynamicManagerSelection {
       $ui.Controls.PreviewImage.Source=Read-DynamicManagerBitmap $item.ThumbnailPath
       $ui.Controls.PlayButton.Visibility='Visible';$ui.Controls.PreviewNotice.Text='静音循环预览，播放不会改变当前背景。'
     }else{
-      $bitmap=Read-DynamicManagerBitmap $item.MediaPath 1600
+      $path=$item.MediaPath;$width=1600
+      if($ui.Controls.PreviewOverlay.Visibility -ne 'Visible' -and $item.ThumbnailPath){$path=$item.ThumbnailPath;$width=640}
+      $bitmap=Read-DynamicManagerBitmap $path $width
       if(-not $bitmap){$bitmap=Read-DynamicManagerBitmap $item.ThumbnailPath;$ui.Controls.PreviewNotice.Text='完整预览受限，已尝试显示缩略图。'}
       $ui.Controls.PreviewImage.Source=$bitmap
     }
@@ -260,7 +271,7 @@ function Start-DynamicManagerWork {
   $runspace=[RunspaceFactory]::CreateRunspace();$runspace.ApartmentState='STA';$runspace.ThreadOptions='ReuseThread';$runspace.Open()
   $worker.Runspace=$runspace
   $body={
-    param($InstallRoot,$StateRoot,$ModuleRoot,$Operation,$Argument,$Name,$PrepareOnly,$Queue)
+    param($InstallRoot,$StateRoot,$ModuleRoot,$Operation,$Argument,$Name,$PrepareOnly,$Queue,$PreviousConnection)
     $ErrorActionPreference='Stop'
     . (Join-Path $ModuleRoot 'media.ps1');Initialize-DynamicMedia -InstallRoot $InstallRoot
     . (Join-Path $ModuleRoot 'wallpaper-library.ps1')
@@ -268,9 +279,10 @@ function Start-DynamicManagerWork {
     $report={param($message)$Queue.Enqueue([string]$message)}
     if($PrepareOnly -and $Operation -in @('Apply','Open','Restore')){throw '预览模式不能更改真实 Codex。'}
     # Detection is read-only, including in preview mode. Apply/open/restore remain blocked there.
-    $connection=Get-DynamicCodexConnection
+    $connection=$PreviousConnection
+    if(-not $connection -or $Operation -in @('Refresh','Apply','Open','Restore')){$connection=Get-DynamicCodexConnection}
     if($Operation -in @('Apply','Open') -and -not $connection.Available){throw $connection.Message}
-    $selected=$null;$message='壁纸库已加载。';$engineReport=$null
+    $selected=$null;$message='壁纸库已加载。';$engineReport=$null;$cancelled=$false
     try { switch($Operation){
       'Import' {
         $kind='Video';if([IO.Path]::GetExtension($Argument).ToLowerInvariant() -in @('.png','.jpg','.jpeg','.webp')){$kind='Image'}
@@ -295,22 +307,21 @@ function Start-DynamicManagerWork {
       'Restore' {
         $restored=Restore-DynamicWallpaperAppearance $StateRoot {Invoke-DynamicEngine -StateRoot $StateRoot -Restore}
         $message='当前为原始外观，壁纸收藏仍保留。'
-        if($restored -eq $false){$message='已取消恢复。'}
+        if($restored -eq $false){$message='已取消恢复。';$cancelled=$true}
       }
       'Refresh' { }
       default {throw '未知管理操作。'}
     }}catch{
       if(-not (Test-DynamicOperationCancelled $_.Exception)){throw}
-      $selected=$Argument;$message='已取消操作，原有外观未改变。'
+      $selected=$Argument;$message='已取消操作，原有外观未改变。';$cancelled=$true
     }
     $status=Get-DynamicWallpaperStatus $StateRoot
     if($Operation -in @('Apply','Open','Restore')){$connection=Get-DynamicCodexConnection}
     if($status.Error){$message='读取当前背景失败：'+$status.Error}
-    elseif($Operation -eq 'Refresh' -and $status.HasExternalCurrent){$message='可点击“保存当前背景”，将当前画面加入收藏。'}
     if($PrepareOnly){$message='预览模式 · '+$message}
-    [pscustomobject]@{Items=@(Get-DynamicWallpaperItems $StateRoot);Status=$status;Connection=$connection;SelectedId=$selected;Message=$message;EngineReport=$engineReport;PromptCurrent=($status.HasExternalCurrent -and -not (Test-DynamicCurrentImportPromptDismissed $StateRoot))}
+    [pscustomobject]@{Items=@(Get-DynamicWallpaperItems $StateRoot);Status=$status;Connection=$connection;SelectedId=$selected;Message=$message;EngineReport=$engineReport;Cancelled=$cancelled}
   }
-  $null=$worker.AddScript($body.ToString()).AddArgument($ui.InstallRoot).AddArgument($ui.StateRoot).AddArgument($ui.ModuleRoot).AddArgument($Operation).AddArgument($Argument).AddArgument($Name).AddArgument($ui.PrepareOnly).AddArgument($queue)
+  $null=$worker.AddScript($body.ToString()).AddArgument($ui.InstallRoot).AddArgument($ui.StateRoot).AddArgument($ui.ModuleRoot).AddArgument($Operation).AddArgument($Argument).AddArgument($Name).AddArgument($ui.PrepareOnly).AddArgument($queue).AddArgument($ui.Connection)
   $ui.Worker=$worker;$ui.Runspace=$runspace;$ui.Queue=$queue;$ui.Async=$worker.BeginInvoke();$ui.Timer.Start()
 }
 
@@ -341,7 +352,8 @@ function Complete-DynamicManagerWork {
       if($kinds.Count -eq 1 -and $kinds[0] -in @('Image','Video')){$ui.Filter=$kinds[0]}
     }
     Update-DynamicManagerList $result.SelectedId
-    if($ui.PendingOperation -eq 'Apply'){Show-DynamicManagerToast '壁纸已应用' Success}
+    if($result.Cancelled){Show-DynamicManagerToast $result.Message Info}
+    elseif($ui.PendingOperation -eq 'Apply' -and -not $result.Status.Error){Show-DynamicManagerToast '壁纸已应用' Success}
     if($ui.PendingOperation -eq 'Refresh' -and $ui.HasCheckedConnection){
       if($ui.Connection.Connected){Show-DynamicManagerToast ('连接成功 · Codex '+$ui.Connection.Version) Success}else{Show-DynamicManagerToast '连接失败，请重试' Error}
     }
@@ -447,8 +459,8 @@ function Show-DynamicSkinManager {
 function Show-DynamicCodexPreview {
   $ui=$script:SkinManager
   if($ui.Busy -or -not $ui.Selected){return}
-  Update-DynamicManagerSelection
   $ui.Controls.PreviewOverlay.Visibility='Visible'
+  Update-DynamicManagerSelection
   if($ui.Selected.Kind -eq 'Video' -and $ui.Selected.IsAvailable){
     $ui.Controls.PreviewVideo.Source=[uri]$ui.Selected.MediaPath
     $ui.Controls.PreviewVideo.Visibility='Visible';$ui.Controls.PreviewVideo.Play();$ui.Playing=$true;$ui.Controls.PlayButton.Content='暂停预览'

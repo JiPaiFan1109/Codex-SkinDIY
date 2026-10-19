@@ -119,3 +119,7 @@ If this tool helps you, contributions support continued maintenance.
 ### Version 1.0.0 candidate
 
 The redesigned gallery includes Codex appearance preview and automatic Wallpaper Engine video/image imports from Steam libraries. Scene, Web and application projects are not supported. Compatible H.264 MP4 files (up to 1080p/60fps and 128 MiB) are copied without transcoding; duplicates are detected before media preparation. Update notices show the installed version, new version and release highlights in the new visual style.
+
+## 1.0.0 controls
+
+Click the lower-left connection icon to recheck the verified Codex session. Applying a wallpaper starts or connects Codex automatically; a necessary restart requests confirmation. The upper-right menu contains Check for updates and Restore original appearance. Hold and drag a wallpaper onto another card to swap and persist their positions. Drag any corner to scale the window proportionally.

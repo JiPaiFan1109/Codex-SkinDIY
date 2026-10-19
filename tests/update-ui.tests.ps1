@@ -17,6 +17,7 @@ try{
   $ui.Controls.UpdateBanner.Visibility='Visible'
   $ui.Controls.SkipUpdateButton.RaiseEvent((New-Object Windows.RoutedEventArgs ([Windows.Controls.Button]::ClickEvent)))
   if((Read-DynamicUpdateState $root).SkippedVersion -ne '0.4.0' -or $ui.Controls.UpdateBanner.Visibility -ne 'Collapsed'){throw 'Skip button did not persist and dismiss the update'}
+  if($null -ne $ui.AvailableUpdate){throw 'Skipped update remains in UI state'}
   $ui.Controls.UpdateBanner.Visibility='Visible'
   $ui.Controls.LaterUpdateButton.RaiseEvent((New-Object Windows.RoutedEventArgs ([Windows.Controls.Button]::ClickEvent)))
   if($ui.Controls.UpdateBanner.Visibility -ne 'Collapsed'){throw 'Later button did not dismiss the update'}

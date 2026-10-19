@@ -89,7 +89,7 @@ function Initialize-DynamicUpdateUI {
   $ui.Controls.SkipUpdateButton.Add_Click({
     try{
       $ui=$script:SkinManager;$state=Read-DynamicUpdateState $ui.StateRoot;$state.SkippedVersion=$ui.AvailableUpdate.version
-      Save-DynamicUpdateState $ui.StateRoot $state;$ui.Controls.UpdateBanner.Visibility='Collapsed';$ui.Controls.UpdateText.Text='已跳过此版本，可手动检查更新。'
+      Save-DynamicUpdateState $ui.StateRoot $state;$ui.AvailableUpdate=$null;$ui.Controls.UpdateBanner.Visibility='Collapsed';$ui.Controls.UpdateText.Text='已跳过此版本，可手动检查更新。'
     }catch{$script:SkinManager.Controls.UpdateText.Text='无法保存跳过设置，请重试。'}
   })
   $ui.Controls.InstallUpdateButton.Add_Click({

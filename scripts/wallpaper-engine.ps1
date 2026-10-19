@@ -32,13 +32,14 @@ function Get-DynamicWallpaperEngineRoots {
   })|Sort-Object -Unique
 }
 function Get-DynamicWallpaperEngineProjects {
-  param([string]$Root,[int]$Depth=0)
-  Assert-DreamSkinNoReparseComponents -Path $Root
+  param([string]$Root,[int]$Depth=0,[scriptblock]$OnError)
+  try{Assert-DreamSkinNoReparseComponents -Path $Root}catch{if($OnError){& $OnError $Root $_.Exception.Message;return};throw}
   if(Test-Path -LiteralPath (Join-Path $Root 'project.json') -PathType Leaf){Get-Item -LiteralPath $Root;return}
   if($Depth -ge 5){return}
-  foreach($child in Get-ChildItem -LiteralPath $Root -Directory -ErrorAction Stop){
+  try{$children=@(Get-ChildItem -LiteralPath $Root -Directory -ErrorAction Stop)}catch{if($OnError){& $OnError $Root $_.Exception.Message;return};throw}
+  foreach($child in $children){
     if(($child.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){continue}
-    Get-DynamicWallpaperEngineProjects $child.FullName ($Depth+1)
+    Get-DynamicWallpaperEngineProjects $child.FullName ($Depth+1) $OnError
   }
 }
 function Import-DynamicWallpaperEngine {
@@ -47,8 +48,7 @@ function Import-DynamicWallpaperEngine {
   $result=[pscustomobject]@{Imported=0;Existing=0;Skipped=0;Failed=0;Details=@();SelectedId=$null;Roots=@($Roots)}
   $visited=@{}
   foreach($root in $Roots|Sort-Object -Unique){
-    Assert-DreamSkinNoReparseComponents -Path $root
-    foreach($directory in Get-DynamicWallpaperEngineProjects $root){
+    foreach($directory in Get-DynamicWallpaperEngineProjects $root -OnError {param($path,$message);$result.Failed++;$result.Details+=($path+'：'+$message)}){
       if($visited.ContainsKey($directory.FullName)){continue};$visited[$directory.FullName]=$true
       $label=$directory.Name
       try{

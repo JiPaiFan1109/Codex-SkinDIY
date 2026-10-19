@@ -27,6 +27,8 @@ try {
   Assert ($items.Count -eq 1 -and $items[0].Name -eq 'Earth') 'Project title or durable import lost'
   $again=Import-DynamicWallpaperEngine -Roots $roots -StateRoot $state
   Assert ($again.Imported -eq 0 -and $again.Existing -eq 1) 'Repeated batch duplicated wallpapers'
+  $partial=Import-DynamicWallpaperEngine -Roots @((Join-Path $root 'missing'),$workshop) -StateRoot $state
+  Assert ($partial.Existing -eq 1 -and $partial.Failed -eq 4) 'Unavailable root aborted remaining imports'
   Assert (-not (Test-Path (Join-Path $state 'active-theme'))) 'Batch import changed active background'
   'PASS: multi-library discovery, mixed batch, unsafe paths, missing media, deduplication and import isolation'
 }finally{

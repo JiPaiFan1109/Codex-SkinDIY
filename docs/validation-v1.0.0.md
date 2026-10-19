@@ -91,3 +91,6 @@
 设置面板采用已认可的图标上/文字下、等宽等高双卡片；检查更新改为 Lucide refresh-cw 路径，恢复原始外观保留此前确认的窗口回退图案。标题、内容与版本信息对齐。Lucide 许可已附于 THIRD_PARTY_NOTICES.md。
 
 完整回归：25 项 Node 测试及 46 个 Windows 脚本通过（dist/drag-all-tests.log）。随后窗口坐标移动测试、WPF 集成测试及更新面板布局测试补跑通过（dist/drag-integration-final.log）。尚未发布，未覆盖正式安装。
+
+## 2026-10-19 发布前业务复核
+用户请求整体检查优化后发布，随后补充要求上传前先打开预览；当前上传与发布暂停等待预览确认。修复与验收详见 business-review-v1.0.0.md。候选包已重建到 D:/CodexSkin-v1-validation-20261019/release-review，真实安装、启动、签名升级、占用保护和卸载生命周期测试通过；0.3.0 更新兼容校验通过。

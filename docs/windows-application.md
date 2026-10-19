@@ -1,12 +1,12 @@
 # Windows 安装应用
 
-版本：0.2.0。目标为 Windows x64，用户已安装官方 Microsoft Store OpenAI.Codex 包。
+版本：1.0.0。目标为 Windows x64，用户已安装官方 Microsoft Store OpenAI.Codex 包。
 
 ## 应用与本机 Codex
 
 `CodexSkinManager.exe` 是带专用图标的 Windows 图形入口，通过隐藏的 Windows PowerShell 5.1 STA 进程加载现有 WPF 管理中心。入口持有命名互斥量，避免同时打开多个管理窗口，并让安装器检测管理中心是否仍在运行。
 
-管理中心通过现有 `Get-DreamSkinCodexInstall` 检测当前用户注册的官方包，显示版本与可供查看的安装路径。找不到包或验证失败时保留壁纸库管理功能，禁用应用和打开 Codex；「重新检测」会再次查询。检测到安装表示找到了受支持客户端，不表示已经完成当前会话的皮肤注入。点击应用后仍由原有引擎完成启动、调试连接、注入和结果验证；涉及关闭会话时沿用原有确认提示。
+管理中心通过现有 `Get-DreamSkinCodexInstall` 检测当前用户注册的官方包，显示版本与可供查看的安装路径。找不到包或验证失败时保留壁纸库管理功能，禁用应用和打开 Codex；点击左下连接图标会再次查询。检测到安装表示找到了受支持客户端，不表示已经完成当前会话的皮肤注入。点击应用后仍由原有引擎完成启动、调试连接、注入和结果验证；涉及关闭会话时沿用原有确认提示。
 
 首版没有新增非 Store 安装检测，不支持 macOS、Linux 或 Windows ARM64。Codex 本体不随安装包分发，不需要用户提供 API Key。
 

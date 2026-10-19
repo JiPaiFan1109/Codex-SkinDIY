@@ -39,7 +39,7 @@ if($MyInvocation.InvocationName -ne '.'){
   $success=$false
   try{
     Invoke-DynamicUpdateInstall $InstallRoot $PSScriptRoot $Version $ManagerProcessId
-    $success=$true;$message='已更新至 '+$Version+'。壁纸收藏已保留，可点击“打开 Codex”重新连接换肤。'
+    $success=$true;$message='已更新至 '+$Version+'。壁纸收藏已保留，选择壁纸并点击应用可重新连接换肤。'
   }catch{$message='更新未完成：'+$_.Exception.Message}
   [IO.File]::WriteAllText((Join-Path $InstallRoot 'update-result.json'),(@{Success=$success;Message=$message}|ConvertTo-Json -Compress),(New-Object Text.UTF8Encoding($false)))
   $launcher=Join-Path $InstallRoot 'CodexSkinManager.exe'

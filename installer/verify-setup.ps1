@@ -38,8 +38,8 @@ try{
       $childInfo=Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$manager.Id+" AND Name='powershell.exe'")|Select-Object -First 1
       if($childInfo){$child=Get-Process -Id $childInfo.ProcessId -ErrorAction SilentlyContinue}
       if($manager.HasExited){throw 'Installed application exited before opening its manager window'}
-    }while(($null -eq $child -or $child.MainWindowTitle -ne 'Codex 换肤管理中心') -and [datetime]::UtcNow -lt $deadline)
-    if($null -eq $child -or $child.MainWindowTitle -ne 'Codex 换肤管理中心'){throw 'Installed application did not open the manager window'}
+    }while(($null -eq $child -or $child.MainWindowTitle -ne 'Codex 皮肤管理中心') -and [datetime]::UtcNow -lt $deadline)
+    if($null -eq $child -or $child.MainWindowTitle -ne 'Codex 皮肤管理中心'){throw 'Installed application did not open the manager window'}
     # Refresh/import startup can be busy briefly; Closing intentionally refuses during work.
     do{
       $null=$child.CloseMainWindow()
@@ -52,7 +52,7 @@ try{
     if($child -and -not $child.HasExited){Stop-Process -Id $child.Id -Force}
     if($manager -and -not $manager.HasExited){Stop-Process -Id $manager.Id -Force}
   }
-  New-Item (Join-Path $installed 'wallpaper-library') -ItemType Directory|Out-Null
+  New-Item (Join-Path $installed 'wallpaper-library') -ItemType Directory -Force|Out-Null
   $kept=Join-Path $installed 'wallpaper-library/user-image.txt'
   Set-Content $kept 'keep my wallpaper'
   # Exercise the actual updater against the real isolated Inno installer, using a test-only key.
