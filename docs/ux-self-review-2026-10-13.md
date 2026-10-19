@@ -33,4 +33,4 @@
 
 同学测试前先保存 Codex 工作，使用最新版下载链接。遇到问题记录操作顺序、完整提示截图、Codex 版本及收藏是否保留。
 
-验证记录位于 [Windows UX regression review](https://github.com/JiPaiFan1109/Codex-Dynamic-Skin/actions/workflows/verify-windows.yml)，源码改动位于 [修复 PR](https://github.com/JiPaiFan1109/Codex-Dynamic-Skin/pull/1)。
+验证记录位于 [Windows UX regression review](https://github.com/JiPaiFan1109/Codex-SkinDIY/actions/workflows/verify-windows.yml)，源码改动位于 [修复 PR](https://github.com/JiPaiFan1109/Codex-SkinDIY/pull/1)。

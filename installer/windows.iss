@@ -14,8 +14,8 @@ AppId={{97EC4AF8-3971-4B65-A78E-16B0D870C41D}
 AppName=Codex 换肤管理中心
 AppVersion={#AppVersion}
 AppPublisher=Codex Dynamic Skin contributors
-AppPublisherURL=https://github.com/JiPaiFan1109/Codex-Dynamic-Skin
-AppSupportURL=https://github.com/JiPaiFan1109/Codex-Dynamic-Skin/issues
+AppPublisherURL=https://github.com/JiPaiFan1109/Codex-SkinDIY
+AppSupportURL=https://github.com/JiPaiFan1109/Codex-SkinDIY/issues
 #ifdef TestInstallRoot
 DefaultDirName={#TestInstallRoot}
 #else
