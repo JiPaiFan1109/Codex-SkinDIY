@@ -53,6 +53,36 @@ function Assert-DynamicUpdateFile {
   if((Get-Item -LiteralPath $Path).Length -ne $Manifest.size -or (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -ine $Manifest.sha256){throw '更新包校验失败，原有程序未被替换。'}
 }
 
+function Get-DynamicUpdateHttpStatus {
+  param($Exception)
+  for($currentException=$Exception;$null -ne $currentException;$currentException=$currentException.InnerException){
+    if($currentException.Data -and $currentException.Data.Contains('UpdateHttpStatus')){return [int]$currentException.Data['UpdateHttpStatus']}
+    if($currentException -is [Net.WebException] -and $currentException.Response -is [Net.HttpWebResponse]){return [int]$currentException.Response.StatusCode}
+  }
+  return 0
+}
+
+function Get-DynamicUpdateFailureMessage {
+  param($Exception)
+  $status=Get-DynamicUpdateHttpStatus $Exception
+  if($status -eq 403 -or $status -eq 429){return ('更新服务器暂时限制了访问（'+$status+'），请稍后重试，也可从 GitHub 发布页下载安装。')}
+  if($status -eq 404){return '暂时找不到更新文件，请稍后重试。'}
+  if($status -ge 500){return '更新服务器暂时不可用，请稍后重试。'}
+  for($currentException=$Exception;$null -ne $currentException;$currentException=$currentException.InnerException){
+    if($currentException -is [Net.WebException]){return '无法连接更新服务器，请检查网络后重试。'}
+  }
+  return [string]$Exception.Message
+}
+
+function Write-DynamicUpdateFailure {
+  param([string]$StateRoot,[string]$Stage,$Exception)
+  try{
+    $logs=Join-Path $StateRoot 'logs';[IO.Directory]::CreateDirectory($logs)|Out-Null
+    $line=[datetime]::UtcNow.ToString('o')+' '+$Stage+' HTTP='+(Get-DynamicUpdateHttpStatus $Exception)+[Environment]::NewLine
+    [IO.File]::AppendAllText((Join-Path $logs 'update-error.log'),$line,[Text.UTF8Encoding]::new($false))
+  }catch{}
+}
+
 function Receive-DynamicUpdateFile {
   param([string]$Url,[string]$Path,[long]$Limit,[scriptblock]$Report)
   [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
@@ -72,6 +102,13 @@ function Receive-DynamicUpdateFile {
       }
     }
     $complete=$true
+  }catch{
+    $failure=$_.Exception
+    $status=Get-DynamicUpdateHttpStatus $failure
+    $message=Get-DynamicUpdateFailureMessage $failure
+    $reported=[InvalidOperationException]::new($message,$failure)
+    if($status){$reported.Data['UpdateHttpStatus']=$status}
+    throw $reported
   }finally{
     if($outputStream){$outputStream.Dispose()};if($inputStream){$inputStream.Dispose()};if($response){$response.Dispose()}
     if(-not $complete -and (Test-Path -LiteralPath $Path)){Remove-Item -LiteralPath $Path -Force}
@@ -88,15 +125,36 @@ function Get-DynamicAppUpdate {
   New-Item $temp -ItemType Directory|Out-Null
   try{
     $releasePath=Join-Path $temp 'release.json'
-    Receive-DynamicUpdateFile 'https://api.github.com/repos/JiPaiFan1109/Codex-Dynamic-Skin/releases/latest' $releasePath 1MB
-    $release=[IO.File]::ReadAllText($releasePath)|ConvertFrom-Json
-    if($release.draft -or $release.prerelease -or $release.tag_name -cnotmatch '^v\d+\.\d+\.\d+$'){throw '无法确认稳定版本。'}
-    $version=$release.tag_name.Substring(1)
+    $apiUnavailable=$false
+    try{Receive-DynamicUpdateFile 'https://api.github.com/repos/JiPaiFan1109/Codex-SkinDIY/releases/latest' $releasePath 1MB}
+    catch{
+      Write-DynamicUpdateFailure $StateRoot 'check-api' $_.Exception
+      $apiUnavailable=$true
+    }
+    $json=Join-Path $temp 'update.json';$sig=Join-Path $temp 'update.sig'
+    if($apiUnavailable){
+      # This official Release endpoint does not use the REST API request quota.
+      # Its metadata still has to pass the same pinned-key signature checks.
+      $latest='https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download'
+      try{
+        Receive-DynamicUpdateFile ($latest+'/update.json') $json 64KB
+        Receive-DynamicUpdateFile ($latest+'/update.sig') $sig 4KB
+      }catch{
+        Write-DynamicUpdateFailure $StateRoot 'check-release-fallback' $_.Exception
+        throw
+      }
+      $version=[string](([IO.File]::ReadAllText($json)|ConvertFrom-Json).version)
+      $verified=Read-DynamicSignedUpdate $json $sig (Join-Path $InstallRoot 'scripts/update-public-key.xml') $version
+    }else{
+      $release=[IO.File]::ReadAllText($releasePath)|ConvertFrom-Json
+      if($release.draft -or $release.prerelease -or $release.tag_name -cnotmatch '^v\d+\.\d+\.\d+$'){throw '无法确认稳定版本。'}
+      $version=$release.tag_name.Substring(1)
+    }
     $current=[IO.File]::ReadAllText((Join-Path $InstallRoot 'VERSION')).Trim()
     if(-not(Test-DynamicNewVersion $version $current)){return $null}
     if(-not $Manual -and $state.SkippedVersion -eq $version){return $null}
-    $base='https://github.com/JiPaiFan1109/Codex-Dynamic-Skin/releases/download/v'+$version
-    $json=Join-Path $temp 'update.json';$sig=Join-Path $temp 'update.sig'
+    if($apiUnavailable){return $verified}
+    $base='https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/download/v'+$version
     Receive-DynamicUpdateFile ($base+'/update.json') $json 64KB
     Receive-DynamicUpdateFile ($base+'/update.sig') $sig 4KB
     return Read-DynamicSignedUpdate $json $sig (Join-Path $InstallRoot 'scripts/update-public-key.xml') $version
@@ -111,7 +169,7 @@ function Save-DynamicAppUpdate {
   New-Item $temp -ItemType Directory|Out-Null
   try{
     # Re-fetch and verify the signed release at the download boundary, never trust UI state.
-    $base='https://github.com/JiPaiFan1109/Codex-Dynamic-Skin/releases/download/v'+$Manifest.version
+    $base='https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/download/v'+$Manifest.version
     Receive-DynamicUpdateFile ($base+'/update.json') (Join-Path $temp 'update.json') 64KB
     Receive-DynamicUpdateFile ($base+'/update.sig') (Join-Path $temp 'update.sig') 4KB
     $verified=Read-DynamicSignedUpdate (Join-Path $temp 'update.json') (Join-Path $temp 'update.sig') (Join-Path $InstallRoot 'scripts/update-public-key.xml') $Manifest.version
