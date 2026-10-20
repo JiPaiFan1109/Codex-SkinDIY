@@ -44,6 +44,7 @@
 
 | 日期（北京时间） | 版本 | 更新内容 |
 | --- | --- | --- |
+| 2026-10-20 | [1.1.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.1) | 修复更新安装失败、下载校验失败，改善受限网络下的更新检查 |
 | 2026-10-20 | [1.1.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.0) | 更新更方便、壁纸更稳定、多窗口支持、清晰度修复与壁纸目录刷新 |
 | 2026-10-19 | [1.0.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.0.0) | 新版管理中心、Wallpaper Engine 批量导入、快速去重、预览、拖拽排序与签名更新 |
 | 2026-10-17 | [0.3.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.3.0) | 应用内更新提醒与一键升级，签名校验，保留壁纸库 |

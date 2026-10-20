@@ -43,6 +43,7 @@ Recorded from a real Codex window after checking for sensitive information. The 
 
 | Date (Beijing time) | Version | Changes |
 | --- | --- | --- |
+| 2026-10-20 | [1.1.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.1) | Fix update installation and download verification failures; improve update checks on restricted networks |
 | 2026-10-20 | [1.1.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.0) | Easier in-app updates, wallpaper recovery, multiple windows, clarity fixes, and folder refresh |
 | 2026-10-17 | [0.3.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.3.0) | In-app update notices and one-click upgrades with signed manifests; wallpaper library retained |
 | 2026-10-16 | [0.2.2](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.2) | Setup safely retires verified skin helpers left after windows close, preserving Codex and user data |
