@@ -69,10 +69,10 @@ Type: files; Name: "{app}\engine\scripts\verify-dream-skin.ps1"
 
 [Icons]
 #ifndef TestInstallRoot
-Name: "{userprograms}\Codex 换肤管理中心\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"
+Name: "{userprograms}\Codex 换肤管理中心\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"; AppUserModelID: "CodexDynamicSkin.Manager"
 Name: "{userprograms}\Codex 换肤管理中心\打开换肤版 Codex"; Filename: "{app}\engine\launcher\CodexDynamicSkinLauncher.exe"; IconFilename: "{app}\CodexSkinManager.exe"
 Name: "{userprograms}\Codex 换肤管理中心\卸载"; Filename: "{uninstallexe}"
-Name: "{userdesktop}\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"; Tasks: desktopicon
+Name: "{userdesktop}\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"; AppUserModelID: "CodexDynamicSkin.Manager"; Tasks: desktopicon
 #endif
 
 [Run]
