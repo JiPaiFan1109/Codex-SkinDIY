@@ -55,7 +55,7 @@ function Get-DynamicWallpaperDirectory {
 
 function Read-DynamicWallpaperItem {
   param([string]$Directory,[string]$Id)
-  $item=[pscustomobject]@{Id=$Id;Name='不可用壁纸';Kind='Unknown';MediaPath=$null;ThumbnailPath=$null;Size=0L;Sha256=$null;ImportedAtUtc=[datetime]::MinValue;IsAvailable=$false;Error=$null;DiskSize=0L;Sources=@('Local')}
+  $item=[pscustomobject]@{Id=$Id;Name='不可用壁纸';Kind='Unknown';MediaPath=$null;ThumbnailPath=$null;Size=0L;Sha256=$null;ImportedAtUtc=[datetime]::MinValue;IsAvailable=$false;Error=$null;DiskSize=0L;Sources=@('Local');Transparency=0;PreviewLevel=50}
   try {
     Assert-DreamSkinNoReparseComponents -Path $Directory
     $json=Join-Path $Directory 'item.json'
@@ -64,6 +64,17 @@ function Read-DynamicWallpaperItem {
     if($entry.schema -cne 'codex-dynamic-skin-wallpaper/1' -or $entry.id -cne $Id -or $entry.kind -cnotin @('Image','Video')){throw '壁纸元数据格式无效。'}
     $item.Name=Assert-DynamicWallpaperName ([string]$entry.name)
     $item.Kind=$entry.kind
+    if($entry.PSObject.Properties['transparency']){
+      $value=[double]$entry.transparency
+      if([double]::IsNaN($value) -or $value -lt 0 -or $value -gt 100){throw '壁纸透明度无效。'}
+      $item.Transparency=[int][Math]::Round($value)
+    }
+    $item.PreviewLevel=50+[int][Math]::Round($item.Transparency/2.0)
+    if($entry.PSObject.Properties['previewLevel']){
+      $level=[double]$entry.previewLevel
+      if([double]::IsNaN($level) -or $level -lt 0 -or $level -gt 100){throw '背景强度无效。'}
+      $item.PreviewLevel=[int][Math]::Round($level)
+    }
     if($entry.sources){$item.Sources=@($entry.sources|Where-Object {$_ -in @('Local','WallpaperEngine')}|Select-Object -Unique)}
     $pattern='^wallpaper\.(png|jpg|jpeg|webp)$'; if($entry.kind -eq 'Video'){$pattern='^wallpaper\.mp4$'}
     if([string]$entry.mediaFile -cnotmatch $pattern -or $entry.thumbnailFile -cne 'thumbnail.png'){throw '壁纸文件路径无效。'}
@@ -131,6 +142,32 @@ function Switch-DynamicWallpaperOrder {
     $path=Join-Path (Get-DynamicWallpaperPaths $StateRoot).Library 'order.json'
     Assert-DreamSkinNoReparseComponents -Path $path
     Write-DreamSkinUtf8FileAtomically -Path $path -Content (@{schema=1;ids=$ids}|ConvertTo-Json)
+  }
+}
+
+function Set-DynamicWallpaperTransparency {
+  param([string]$StateRoot,[string]$Id,[ValidateRange(0,100)][int]$Transparency)
+  Invoke-DynamicWallpaperLock $StateRoot {
+    $item=Get-DynamicWallpaperItem $StateRoot $Id
+    if(-not $item.IsAvailable -or $item.Kind -ne 'Image'){throw '仅可调整可用的静态壁纸。'}
+    $path=Join-Path (Get-DynamicWallpaperDirectory $StateRoot $Id) 'item.json'
+    $entry=[IO.File]::ReadAllText($path)|ConvertFrom-Json
+    $entry|Add-Member -NotePropertyName transparency -NotePropertyValue $Transparency -Force
+    Write-DreamSkinUtf8FileAtomically -Path $path -Content ($entry|ConvertTo-Json)
+    Get-DynamicWallpaperItem $StateRoot $Id
+  }
+}
+
+function Set-DynamicWallpaperPreviewLevel {
+  param([string]$StateRoot,[string]$Id,[ValidateRange(0,100)][int]$Level)
+  Invoke-DynamicWallpaperLock $StateRoot {
+    $item=Get-DynamicWallpaperItem $StateRoot $Id
+    if(-not $item.IsAvailable -or $item.Kind -ne 'Image'){throw '仅可调整可用的静态壁纸。'}
+    $path=Join-Path (Get-DynamicWallpaperDirectory $StateRoot $Id) 'item.json'
+    $entry=[IO.File]::ReadAllText($path)|ConvertFrom-Json
+    $entry|Add-Member -NotePropertyName previewLevel -NotePropertyValue $Level -Force
+    Write-DreamSkinUtf8FileAtomically -Path $path -Content ($entry|ConvertTo-Json)
+    Get-DynamicWallpaperItem $StateRoot $Id
   }
 }
 
@@ -280,7 +317,7 @@ function Use-DynamicWallpaper {
         try {Assert-DreamSkinImageFile -Path $item.ThumbnailPath; $preview=$item.ThumbnailPath} catch { }
       }
     }
-    $prepared=[pscustomobject]@{Kind=$item.Kind;Path=$item.MediaPath;Preview=$preview;Size=$item.Size;Sha256=$item.Sha256}
+    $prepared=[pscustomobject]@{Kind=$item.Kind;Path=$item.MediaPath;Preview=$preview;Size=$item.Size;Sha256=$item.Sha256;ImageOpacity=(1-[Math]::Max(0.0,($item.PreviewLevel-50)/50.0));ImageShade=([Math]::Min(1.0,$item.PreviewLevel/50.0))}
     Set-DynamicBackground -Prepared $prepared -StateRoot $StateRoot -Apply $Apply
     return $item
   }

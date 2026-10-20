@@ -1,4 +1,4 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'scripts/app-update.ps1')
 function Assert($Condition,$Message){if(-not $Condition){throw $Message}}
@@ -52,7 +52,9 @@ try{
   Reject {Invoke-DynamicUpdateInstall $root $stage '0.4.0' 0}
   Assert ((Get-Content (Join-Path $root 'VERSION')) -eq '0.3.0') 'Failed install changed version'
   Remove-Item (Join-Path $root 'fail')
-  Invoke-DynamicUpdateInstall $root $stage '0.4.0' 0
+  $installMessages=[Collections.Generic.List[string]]::new()
+  Invoke-DynamicUpdateInstall $root $stage '0.4.0' 0 {param($Message)$installMessages.Add($Message)}
+  Assert ($installMessages.Count -ge 3 -and $installMessages[-1] -eq '正在确认安装结果…') 'Installer did not report its actual stages'
   Assert ((Get-Content (Join-Path $root 'VERSION')) -eq '0.4.0') 'Installer was not run'
   Assert ((Get-Content (Join-Path $root 'wallpaper.txt')) -eq 'keep') 'Updater changed user files'
   $arguments=Get-Content (Join-Path $root 'args.txt')

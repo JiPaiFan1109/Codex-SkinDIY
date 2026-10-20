@@ -8,6 +8,7 @@
 
 function Test-DreamSkinFastResumeState {
   param([AllowNull()][object]$State,[object]$Codex,[string]$StateRoot,[object[]]$Processes)
+  if($State -and $State.attachedExisting){return $false}
   if($null -eq $State -or $State.codexPackageFullName -cne $Codex.PackageFullName -or
     -not(Test-DreamSkinPathEqual -Left "$($State.codexExe)" -Right "$($Codex.Executable)")){return $false}
   $paths=@{

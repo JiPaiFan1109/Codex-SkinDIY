@@ -18,6 +18,7 @@ function Test-DynamicTimestampEqual {
 
 function Test-DynamicQuickState {
   param([object]$State,[string]$StateRoot,[object[]]$Processes,[string]$BrowserId)
+  if($State -and $State.attachedExisting){return $false}
   if($null-eq$State -or "$($State.schemaVersion)"-ne'3' -or "$($State.platform)"-ine'windows'){return $false}
   if("$($State.browserId)"-cne$BrowserId -or $BrowserId-cnotmatch '^[A-Za-z0-9._-]{1,200}$'){return $false}
   if("$($State.codexPackageFamilyName)"-cnotmatch '^OpenAI\.Codex_[A-Za-z0-9]+$'){return $false}
@@ -118,6 +119,11 @@ function Invoke-DynamicQuickLauncher {
     $aumid="$($state.codexPackageFamilyName)!App"
     $args="--remote-debugging-address=127.0.0.1 --remote-debugging-port=$port --user-data-dir=`"$($state.profilePath)`""
     if([CodexDynamicSkin.QuickPackageLauncher]::Launch($aumid,$args)-le0){throw 'Window activation failed'}
+    $monitor=Join-Path $ScriptRoot 'multi-instance.ps1'
+    if(Test-Path -LiteralPath $monitor){
+      $monitorArgs='-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$monitor+'" -StateRoot "'+$stateRoot+'"'
+      Start-Process (Join-Path $PSHOME 'powershell.exe') -ArgumentList $monitorArgs -WindowStyle Hidden|Out-Null
+    }
     return $true
   }catch{
     try {

@@ -117,8 +117,9 @@ function Save-DynamicAppUpdate {
     $verified=Read-DynamicSignedUpdate (Join-Path $temp 'update.json') (Join-Path $temp 'update.sig') (Join-Path $InstallRoot 'scripts/update-public-key.xml') $Manifest.version
     $setup=Join-Path $temp 'setup.exe'
     Receive-DynamicUpdateFile $verified.url $setup $verified.size $Report
+    if($Report){& $Report '正在校验更新包…'}
     Assert-DynamicUpdateFile $setup $verified
-    foreach($name in @('app-update.ps1','finish-update.ps1','update-public-key.xml')){Copy-Item -LiteralPath (Join-Path $InstallRoot ('scripts/'+$name)) -Destination $temp}
+    foreach($name in @('app-update.ps1','finish-update.ps1','update-progress.ps1','update-progress.xaml','update-public-key.xml')){Copy-Item -LiteralPath (Join-Path $InstallRoot ('scripts/'+$name)) -Destination $temp}
     return $temp
   }catch{Remove-Item -LiteralPath $temp -Recurse -Force;throw}
 }

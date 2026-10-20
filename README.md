@@ -18,10 +18,10 @@
 ## 界面与功能
 
 <p align="center">
-  <img src="docs/images/skin-manager-v1-gallery.png" width="1100" alt="Codex 新版换肤管理中心：3 行 4 列、12 张示例壁纸的完整画廊">
+  <img src="docs/images/skin-manager-v1.1.0.png" width="1100" alt="Codex 新版换肤管理中心：3 行 4 列、12 张示例壁纸的完整画廊">
 </p>
 
-新版管理中心示意图：以 3 行 × 4 列展示 12 张示例壁纸，呈现完整画廊布局（示例素材不随软件预置）。[查看完整截图](docs/images/skin-manager-v1-gallery.png)。
+新版管理中心示意图：以 3 行 × 4 列展示 12 张示例壁纸，呈现完整画廊布局（示例素材不随软件预置）。[查看完整截图](docs/images/skin-manager-v1.1.0.png)。
 
 - **Wallpaper Engine 导入**：左侧入口自动发现 Steam 库，批量复制视频/图片项目；Scene、Web、应用项目暂不支持。
 - **静态与动态背景**：导入本地图片或视频，为 Codex 更换背景。
@@ -44,6 +44,7 @@
 
 | 日期（北京时间） | 版本 | 更新内容 |
 | --- | --- | --- |
+| 2026-10-20 | [1.1.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.0) | 更新更方便、壁纸更稳定、多窗口支持、清晰度修复与壁纸目录刷新 |
 | 2026-10-19 | [1.0.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.0.0) | 新版管理中心、Wallpaper Engine 批量导入、快速去重、预览、拖拽排序与签名更新 |
 | 2026-10-17 | [0.3.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.3.0) | 应用内更新提醒与一键升级，签名校验，保留壁纸库 |
 | 2026-10-16 | [0.2.2](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.2) | 修复窗口关闭后后台仍阻止升级；安装时安全退出已核实的换肤辅助进程，保留 Codex 和用户数据 |

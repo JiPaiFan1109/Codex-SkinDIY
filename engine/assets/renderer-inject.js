@@ -49,6 +49,9 @@
   let videoOverlay = null;
   let videoVisibilityHandler = null;
   let videoMessageHandler = null;
+  let lastVideoTime = null;
+  let lastVideoProgressAt = 0;
+  let lastVideoRecoveryAt = -Infinity;
   const now = () => typeof performance === "object" && typeof performance.now === "function"
     ? performance.now() : Date.now();
   const metrics = {
@@ -418,9 +421,11 @@
     imageLayer.setAttribute("alt", "");
     imageLayer.setAttribute("draggable", "false");
     imageLayer.src = artUrl;
+    if (Number.isFinite(themeConfig?.imageOpacity)) imageLayer.setAttribute("style", "opacity: " + String(Math.max(0, Math.min(1, themeConfig.imageOpacity))) + ";");
     videoOverlay = document.createElement("div");
     videoOverlay.id = VIDEO_OVERLAY_ID;
     videoOverlay.setAttribute?.("aria-hidden", "true");
+    if (Number.isFinite(themeConfig?.imageShade)) videoOverlay.setAttribute("style", "opacity: " + String(Math.max(0, Math.min(1, themeConfig.imageShade))) + ";");
     document.body.appendChild(imageLayer);
     document.body.appendChild(videoOverlay);
     const state = window[STATE_KEY];
@@ -428,6 +433,40 @@
       state.imageLayer = imageLayer;
       state.videoOverlay = videoOverlay;
     }
+  };
+
+  const repairMedia = () => {
+    if (!document.body || window[DISABLED_KEY]) return;
+    ensureVideoLayer();
+    ensureImageLayer();
+    for (const layer of [imageLayer, videoFrame, videoOverlay]) {
+      if (layer && layer.parentElement !== document.body) document.body.appendChild(layer);
+    }
+    if (imageLayer && imageLayer.src !== artUrl) imageLayer.src = artUrl;
+    const state = window[STATE_KEY];
+    if (!videoFrame || !state?.videoBlobUrl) return;
+    if (videoFrame.src !== state.videoBlobUrl) videoFrame.src = state.videoBlobUrl;
+  };
+
+  const recoverPlayback = () => {
+    if (!videoFrame?.src || window[DISABLED_KEY]) return;
+    const timestamp = now();
+    if (document.hidden) {
+      lastVideoProgressAt = timestamp;
+      lastVideoTime = null;
+      return;
+    }
+    if (lastVideoTime === null || videoFrame.currentTime !== lastVideoTime) {
+      lastVideoTime = videoFrame.currentTime;
+      lastVideoProgressAt = timestamp;
+    }
+    const stalled = timestamp - lastVideoProgressAt >= 15000;
+    if (!(videoFrame.error || videoFrame.paused || stalled) ||
+      timestamp - lastVideoRecoveryAt < 15000) return;
+    lastVideoRecoveryAt = timestamp;
+    lastVideoProgressAt = timestamp;
+    if (videoFrame.error || stalled) videoFrame.load();
+    videoFrame.play().catch(() => {});
   };
 
   const ensure = ({ root: rootPass = true, scope: scopePass = false, parts: partPass = false } = {}) => {
@@ -438,6 +477,7 @@
     if (rootPass) applyRootState(root);
     if (partPass) refreshParts();
     if (scopePass) refreshScope();
+    repairMedia();
   };
 
   const cleanup = () => {
@@ -605,7 +645,8 @@
   const timer = setInterval(() => {
     metrics.safetyPasses += 1;
     ensure({ root: true });
-  }, 30000);
+    recoverPlayback();
+  }, 5000);
   window[STATE_KEY].timer = timer;
   if (mediaHandler && mediaQuery && typeof mediaQuery.addEventListener === "function") {
     mediaQuery.addEventListener("change", mediaHandler);

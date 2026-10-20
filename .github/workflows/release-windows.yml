@@ -6,7 +6,7 @@ on:
       tag:
         description: Existing release tag to build and upload
         required: true
-        default: v0.3.0
+        default: v1.1.0
 
 permissions:
   contents: write
@@ -42,7 +42,7 @@ jobs:
         run: |
           & .\dist\app-package\engine\runtime\node\node.exe --test tests/*.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Node tests failed' }
-          foreach ($test in @('codex-connection.tests.ps1','distribution-cleanup.tests.ps1','uninstall-app.tests.ps1','app-package.tests.ps1','app-update.tests.ps1','update-flow.tests.ps1','update-ui.tests.ps1')) {
+          foreach ($test in @('codex-connection.tests.ps1','distribution-cleanup.tests.ps1','uninstall-app.tests.ps1','app-package.tests.ps1','app-update.tests.ps1','update-flow.tests.ps1','update-ui.tests.ps1','update-staging.tests.ps1','update-progress.tests.ps1','upgrade-helper-cleanup.tests.ps1','upgrade-multi-live.tests.ps1','multi-instance.tests.ps1','apply-clarity.tests.ps1')) {
             & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File (Join-Path tests $test)
             if ($LASTEXITCODE -ne 0) { throw "Application test failed: $test" }
           }
@@ -57,7 +57,9 @@ jobs:
         run: |
           if (-not $env:UPDATE_SIGNING_KEY_XML) { throw 'Missing update signing key' }
           if ($env:RELEASE_TAG -cne ('v'+(Get-Content VERSION -Raw).Trim())) { throw 'Tag does not match VERSION' }
-          .\scripts\sign-update.ps1 -OutputDirectory .\dist -NotesPath (Join-Path 'docs/releases' ($env:RELEASE_TAG+'.md'))
+          $notes = Join-Path 'docs/releases' ($env:RELEASE_TAG+'-app-notes.txt')
+          if (-not (Test-Path $notes)) { $notes = Join-Path 'docs/releases' ($env:RELEASE_TAG+'.md') }
+          .\scripts\sign-update.ps1 -OutputDirectory .\dist -NotesPath $notes
 
       - name: Upload assets to a draft, then publish
         shell: powershell

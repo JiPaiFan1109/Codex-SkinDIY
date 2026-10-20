@@ -1,5 +1,16 @@
 ﻿. (Join-Path $PSScriptRoot 'app-update.ps1')
 
+function Set-DynamicUpdateProgress {
+  param([string]$Message)
+  $ui=$script:SkinManager
+  $ui.Controls.UpdateText.Text=$Message
+  $bar=$ui.Controls.UpdateProgress
+  $bar.Visibility='Visible'
+  $match=[regex]::Match($Message,'(\d{1,3})%')
+  $bar.IsIndeterminate=-not $match.Success
+  if($match.Success){$bar.Value=[Math]::Min(100,[int]$match.Groups[1].Value)}
+}
+
 function Show-DynamicUpdateNotice {
   $ui=$script:SkinManager
   if(-not $ui.AvailableUpdate){return}
@@ -16,12 +27,14 @@ function Start-DynamicUpdateWork {
   if($ui.UpdateWorker -or $ui.PrepareOnly -or $ui.Busy){return}
   if($Operation -eq 'Download' -and -not $ui.AvailableUpdate){return}
   if($Operation -eq 'Download'){
+    Save-DynamicManagerOpacity
+    if($ui.PendingOpacity){Show-DynamicManagerToast '请先保存清晰度设置，再更新。' Error;return}
     $ui.Busy=$true;Stop-DynamicManagerPreview
     $ui.Controls.WorkProgress.Visibility='Visible'
   }
   $ui.UpdateOperation=$Operation;$ui.UpdateManual=[bool]$Manual
   $ui.Controls.UpdateText.Text='正在检查更新…'
-  if($Operation -eq 'Download'){$ui.Controls.UpdateText.Text='正在准备下载…'}
+  if($Operation -eq 'Download'){Set-DynamicUpdateProgress '正在准备下载…'}
   $queue=New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
   $worker=[PowerShell]::Create();$runspace=[RunspaceFactory]::CreateRunspace();$runspace.Open();$worker.Runspace=$runspace
   $body={
@@ -42,7 +55,7 @@ function Start-DynamicUpdateWork {
 
 function Complete-DynamicUpdateWork {
   $ui=$script:SkinManager;$message=$null
-  while($ui.UpdateQueue.TryDequeue([ref]$message)){$ui.Controls.UpdateText.Text=$message}
+  while($ui.UpdateQueue.TryDequeue([ref]$message)){Set-DynamicUpdateProgress $message}
   if(-not $ui.UpdateAsync.IsCompleted){return}
   $ui.UpdateTimer.Stop();$stage=$null
   try{
@@ -64,22 +77,33 @@ function Complete-DynamicUpdateWork {
     else{$ui.Controls.UpdateText.Text='版本 '+$ui.AppVersion+' · 暂时无法检查更新，可稍后手动重试。'}
   }finally{
     $ui.UpdateWorker.Dispose();$ui.UpdateRunspace.Dispose();$ui.UpdateWorker=$null;$ui.UpdateRunspace=$null;$ui.UpdateAsync=$null
-    if($ui.UpdateOperation -eq 'Download'){$ui.Busy=$false;$ui.Controls.WorkProgress.Visibility='Collapsed'}
+    if($ui.UpdateOperation -eq 'Download'){$ui.Busy=$false;$ui.Controls.WorkProgress.Visibility='Collapsed';$ui.Controls.UpdateProgress.Visibility='Collapsed'}
     Update-DynamicManagerButtons
   }
   if($stage){
     try{
+      $ui.Busy=$true;Update-DynamicManagerButtons
+      Set-DynamicUpdateProgress '正在启动安装程序…'
       $helper=Join-Path $stage 'finish-update.ps1'
-      $arguments=@('-NoProfile','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',('"'+$helper+'"'),'-InstallRoot',('"'+$ui.InstallRoot+'"'),'-Version',$ui.AvailableUpdate.version,'-ManagerProcessId',$PID)
-      $null=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList $arguments -WindowStyle Hidden -PassThru
+      $ready=Join-Path $stage 'ui-ready'
+      $arguments=@('-NoProfile','-STA','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',('"'+$helper+'"'),'-InstallRoot',('"'+$ui.InstallRoot+'"'),'-Version',$ui.AvailableUpdate.version,'-ManagerProcessId',$PID,'-ReadyPath',('"'+$ready+'"'))
+      $helperProcess=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList $arguments -WindowStyle Hidden -PassThru
+      try{
+        $deadline=[datetime]::UtcNow.AddSeconds(15)
+        while(-not(Test-Path -LiteralPath $ready)){
+          if($helperProcess.HasExited -or [datetime]::UtcNow -gt $deadline){throw '安装窗口未能启动，管理中心已保留，请重试。'}
+          $ui.Window.Dispatcher.Invoke([action]{},[Windows.Threading.DispatcherPriority]::Background)
+          Start-Sleep -Milliseconds 50
+        }
+      }finally{$helperProcess.Dispose()}
       $ui.Window.Close()
-    }catch{$ui.Controls.UpdateText.Text='无法启动升级，请重试：'+$_.Exception.Message}
+    }catch{$ui.Busy=$false;$ui.Controls.UpdateProgress.Visibility='Collapsed';$ui.Controls.UpdateText.Text='无法启动升级，请重试：'+$_.Exception.Message;Update-DynamicManagerButtons}
   }
 }
 
 function Initialize-DynamicUpdateUI {
   $ui=$script:SkinManager
-  foreach($name in @('CheckUpdateButton','UpdateText','UpdateBanner','UpdateNotes','InstallUpdateButton','LaterUpdateButton','SkipUpdateButton')){$ui.Controls[$name]=$ui.Window.FindName($name)}
+  foreach($name in @('CheckUpdateButton','UpdateText','UpdateProgress','UpdateBanner','UpdateNotes','InstallUpdateButton','LaterUpdateButton','SkipUpdateButton')){$ui.Controls[$name]=$ui.Window.FindName($name)}
   $ui.AppVersion=[IO.File]::ReadAllText((Join-Path $ui.InstallRoot 'VERSION')).Trim()
   $ui.Controls.UpdateText.Text='版本 '+$ui.AppVersion
   $ui.AvailableUpdate=$null;$ui.UpdateWorker=$null;$ui.UpdateRunspace=$null;$ui.UpdateAsync=$null

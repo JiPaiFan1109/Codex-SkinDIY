@@ -521,6 +521,16 @@ export async function loadTheme(themeDir) {
     image,
     appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
   };
+  if (raw.imageShade !== undefined) {
+    if (typeof raw.imageShade !== "number" || !Number.isFinite(raw.imageShade) || raw.imageShade < 0 || raw.imageShade > 1) throw new Error("Invalid wallpaper shade");
+    theme.imageShade = raw.imageShade;
+  }
+  if (raw.imageOpacity !== undefined) {
+    if (typeof raw.imageOpacity !== "number" || !Number.isFinite(raw.imageOpacity) || raw.imageOpacity < 0 || raw.imageOpacity > 1) {
+      throw new Error("Invalid wallpaper image opacity");
+    }
+    theme.imageOpacity = raw.imageOpacity;
+  }
   const [themeStat, imageStat, safeCss] = await Promise.all([
     fs.stat(themePath),
     fs.stat(realImagePath),
@@ -865,6 +875,22 @@ export async function applyToSession(session, payload, videoConfig = null) {
     await installVideoBlob(session, videoConfig);
   }
   return result;
+}
+
+export async function maintainSession(session, payload, videoConfig = null) {
+  const present = await session.evaluate(`(() => {
+    const state = window.__CODEX_DREAM_SKIN_STATE__;
+    if (typeof state?.ensure !== "function" || window.__CODEX_DREAM_SKIN_DISABLED__) return false;
+    state.ensure({root: true});
+    return true;
+  })()`);
+  if (present) return true;
+  // A reload can finish before the load listener is attached. Never reapply
+  // to an unrelated page or an excluded pet surface on the same target.
+  const probe = await probeSession(session);
+  if (!probe?.codex) return false;
+  await applyToSession(session, payload, videoConfig);
+  return true;
 }
 
 export function earlyPayloadFor(payload, revision) {
@@ -1524,6 +1550,7 @@ async function runWatch(options) {
   let lastListErrorLogAt = 0;
   let lastThemeErrorLogAt = 0;
   let lastStrongThemeAuditAt = 0;
+  let lastSessionAuditAt = 0;
   let loadedPayload = null;
   const videoConfig = options.videoState ? await loadVideoReadiness(options.videoState) : null;
   let paused = false;
@@ -1679,6 +1706,23 @@ async function runWatch(options) {
           session.close();
           sessions.delete(id);
           targetFailures.delete(id);
+        }
+      }
+
+      if (!paused && Date.now() - lastSessionAuditAt >= 10000) {
+        lastSessionAuditAt = Date.now();
+        for (const [id, session] of sessions) {
+          try {
+            if (await maintainSession(session, loadedPayload.payload, loadedPayload.video)) continue;
+          } catch (error) {
+            console.error(`[dream-skin] health repair deferred for ${id}: ${error.message}`);
+          }
+          await removeEarlyPayload(session, earlyScripts.get(id));
+          earlyScripts.delete(id);
+          fallbackTargets.delete(id);
+          fallbackListeners.delete(id);
+          session.close();
+          sessions.delete(id);
         }
       }
 

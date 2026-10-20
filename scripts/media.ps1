@@ -37,7 +37,7 @@ function Convert-DynamicVideo {
   if ($seconds -le 0 -or $properties.Width -le 0 -or $properties.Height -le 0) { throw '无法读取视频时长或尺寸。' }
   $bitrate = [Math]::Min(4000000, [Math]::Floor(96MB * 8 / ($seconds + 1)))
   if ($bitrate -lt 400000) { throw '视频过长，请缩短视频后重试；不会自动截断。' }
-  $scale = [Math]::Min(1, [Math]::Min(1920 / $properties.Width, 1080 / $properties.Height))
+  $scale = [Math]::Min(1.0, [Math]::Min(1920 / $properties.Width, 1080 / $properties.Height))
   [IO.File]::WriteAllBytes($TargetPath, [byte[]]@())
   $outputFile = Wait-DynamicWinRT ([Windows.Storage.StorageFile]::GetFileFromPathAsync($TargetPath)) ([Windows.Storage.StorageFile])
   $profile = [Windows.Media.MediaProperties.MediaEncodingProfile]::CreateMp4([Windows.Media.MediaProperties.VideoEncodingQuality]::HD1080p)
@@ -165,7 +165,14 @@ function Invoke-DynamicBackgroundTransaction {
     if ($hadVideo) { Copy-Item -LiteralPath $video -Destination (Join-Path $backup 'video-theme.json') }
     if ((Get-Item -LiteralPath $Prepared.Path).Length -ne $Prepared.Size -or (Get-FileHash -LiteralPath $Prepared.Path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Prepared.Sha256) { throw '准备好的媒体已改变，请重新选择。' }
     $mutating = $true
-    $null = Set-DreamSkinActiveTheme -ImagePath $Prepared.Preview -Name '本地背景' -StateRoot $root
+    $theme=$null
+    if($Prepared.Kind -eq 'Image' -and $null -ne $Prepared.ImageOpacity){
+      $opacity=[double]$Prepared.ImageOpacity
+      if([double]::IsNaN($opacity) -or $opacity -lt 0 -or $opacity -gt 1){throw '壁纸透明度无效。'}
+      $theme=[pscustomobject]@{schemaVersion=1;id='custom';name='本地背景';appearance='auto';imageOpacity=$opacity;imageShade=1}
+      if($null -ne $Prepared.ImageShade){$theme.imageShade=[Math]::Max(0.0,[Math]::Min(1.0,[double]$Prepared.ImageShade))}
+    }
+    $null = Set-DreamSkinActiveTheme -ImagePath $Prepared.Preview -Theme $theme -Name '本地背景' -StateRoot $root
     if ($Prepared.Kind -eq 'Video') {
       Write-DreamSkinUtf8FileAtomically -Path $video -Content (([ordered]@{schema='codex-dream-skin-video/1'; filePath=$Prepared.Path; expectedSize=$Prepared.Size; expectedSha256=$Prepared.Sha256} | ConvertTo-Json -Compress))
     } else { Remove-Item -LiteralPath $video -Force -ErrorAction SilentlyContinue }

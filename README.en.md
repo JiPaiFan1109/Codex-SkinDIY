@@ -18,10 +18,10 @@ A community tool, **not an official OpenAI product or affiliated with OpenAI**. 
 ## Interface and features
 
 <p align="center">
-  <img src="docs/images/skin-manager-v1-gallery.png" width="1100" alt="New Codex Skin Manager: a full gallery of 12 sample wallpapers in 3 rows and 4 columns">
+  <img src="docs/images/skin-manager-v1.1.0.png" width="1100" alt="New Codex Skin Manager: a full gallery of 12 sample wallpapers in 3 rows and 4 columns">
 </p>
 
-New manager illustration: 12 sample wallpapers fill a 3-row, 4-column gallery. Sample artwork is for illustration and is not bundled as preset wallpapers. [View full screenshot](docs/images/skin-manager-v1-gallery.png).
+New manager illustration: 12 sample wallpapers fill a 3-row, 4-column gallery. Sample artwork is for illustration and is not bundled as preset wallpapers. [View full screenshot](docs/images/skin-manager-v1.1.0.png).
 
 - **Images and videos:** import local files and use them as Codex backgrounds.
 - **Wallpaper library:** card gallery, image/video filters, large previews, silent video playback, renaming, and deletion.
@@ -43,6 +43,7 @@ Recorded from a real Codex window after checking for sensitive information. The 
 
 | Date (Beijing time) | Version | Changes |
 | --- | --- | --- |
+| 2026-10-20 | [1.1.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.0) | Easier in-app updates, wallpaper recovery, multiple windows, clarity fixes, and folder refresh |
 | 2026-10-17 | [0.3.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.3.0) | In-app update notices and one-click upgrades with signed manifests; wallpaper library retained |
 | 2026-10-16 | [0.2.2](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.2) | Setup safely retires verified skin helpers left after windows close, preserving Codex and user data |
 | 2026-10-13 | [0.2.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.1) | Fixed repeated cancellation/restore prompts and the status helper; added upgrade preflight and reduced unnecessary dialogs |

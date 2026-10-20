@@ -1,4 +1,4 @@
-﻿param([string]$ScreenshotPath)
+﻿param([string]$ScreenshotPath,[string]$PreviewDirectory)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'scripts/skin-manager.ps1')
@@ -26,6 +26,19 @@ try{
   if($ui.Controls.UpdateText.Text -notmatch '1.0.0' -or $ui.Controls.UpdateText.Text -notmatch '0.3.0'){throw 'Update notice must show candidate and installed versions'}
   if($ui.Controls.UpdateNotes.Text -notmatch 'Wallpaper Engine'){throw 'Release highlights missing'}
   if($window.FindName('SettingsPanel').Visibility -ne 'Visible'){throw 'Automatic update is hidden behind settings'}
+  Set-DynamicUpdateProgress '正在下载更新… 37%'
+  if($ui.Controls.UpdateProgress.Value -ne 37 -or $ui.Controls.UpdateProgress.IsIndeterminate){throw 'Download progress is not visible or measured'}
+  if($PreviewDirectory){
+    foreach($size in @(@(1440,840),@(900,525))){
+      $surface=$window.Content
+      $surface.Measure([Windows.Size]::new($size[0],$size[1]));$surface.Arrange([Windows.Rect]::new(0,0,$size[0],$size[1]));$surface.UpdateLayout()
+      if($ui.Controls.UpdateProgress.ActualWidth -le 0 -or $ui.Controls.InstallUpdateButton.ActualHeight -le 0){throw 'Update controls clipped'}
+      $bitmap=[Windows.Media.Imaging.RenderTargetBitmap]::new($size[0],$size[1],96,96,[Windows.Media.PixelFormats]::Pbgra32);$bitmap.Render($surface)
+      $encoder=[Windows.Media.Imaging.PngBitmapEncoder]::new();$encoder.Frames.Add([Windows.Media.Imaging.BitmapFrame]::Create($bitmap))
+      $stream=[IO.File]::Create((Join-Path $PreviewDirectory ('update-download-'+$size[0]+'.png')))
+      try{$encoder.Save($stream)}finally{$stream.Dispose()}
+    }
+  }
 
   $visual=$window.Content;$visual.Measure([Windows.Size]::new(1180,860));$visual.Arrange([Windows.Rect]::new(0,0,1180,860));$visual.UpdateLayout()
   if($ui.Controls.InstallUpdateButton.ActualWidth -le 0){throw 'Update action was not laid out'}

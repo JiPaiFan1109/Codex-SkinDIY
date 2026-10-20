@@ -29,6 +29,17 @@ try {
   Assert ($again.Imported -eq 0 -and $again.Existing -eq 1) 'Repeated batch duplicated wallpapers'
   $partial=Import-DynamicWallpaperEngine -Roots @((Join-Path $root 'missing'),$workshop) -StateRoot $state
   Assert ($partial.Existing -eq 1 -and $partial.Failed -eq 4) 'Unavailable root aborted remaining imports'
+  $null=Rename-DynamicWallpaper $state $items[0].Id 'My renamed wallpaper'
+  $newProject=Join-Path $workshop '6';[IO.Directory]::CreateDirectory($newProject)|Out-Null
+  Add-Type -AssemblyName System.Drawing
+  $newImage=[Drawing.Bitmap]::new(64,64)
+  try{$newImage.SetPixel(0,0,[Drawing.Color]::Blue);$newImage.Save((Join-Path $newProject 'new.png'),[Drawing.Imaging.ImageFormat]::Png)}finally{$newImage.Dispose()}
+  [IO.File]::WriteAllText((Join-Path $newProject 'project.json'),'{"title":"New wallpaper","type":"image","file":"new.png"}')
+  $refresh=Import-DynamicWallpaperEngine -Roots $roots -StateRoot $state
+  Assert ($refresh.Imported -eq 1 -and $refresh.Existing -eq 1 -and @(Get-DynamicWallpaperItems $state).Count -eq 2) 'Refresh must import only newly added wallpaper'
+  $repeat=Import-DynamicWallpaperEngine -Roots $roots -StateRoot $state
+  Assert ($repeat.Imported -eq 0 -and $repeat.Existing -eq 2 -and @(Get-DynamicWallpaperItems $state).Count -eq 2) 'Repeated refresh duplicated wallpapers'
+  Assert ((Get-DynamicWallpaperItem $state $items[0].Id).Name -eq 'My renamed wallpaper') 'Refresh overwrote the user name'
   Assert (-not (Test-Path (Join-Path $state 'active-theme'))) 'Batch import changed active background'
   'PASS: multi-library discovery, mixed batch, unsafe paths, missing media, deduplication and import isolation'
 }finally{

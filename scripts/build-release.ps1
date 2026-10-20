@@ -24,21 +24,22 @@ try {
   Assert-DynamicSkinNode $NodeRuntimePath (Join-Path $PSScriptRoot 'node-runtime.json')
   $nodeLicense = Join-Path (Split-Path $NodeRuntimePath -Parent) 'LICENSE'
   if (-not (Test-Path -LiteralPath $nodeLicense -PathType Leaf)) { throw 'Node LICENSE missing.' }
-  # Bundle the approved UI artwork; icons extracted from the local Codex installation stay local.
+  # Bundle the manager artwork and the Codex connection icon for clean installations.
   $files = @(
     'VERSION','LICENSE','THIRD_PARTY_NOTICES.md','README.md','README.en.md','CHANGELOG.md','SECURITY.md','docs/earth-background.md','docs/images/wechat-donation.jpg','Install.cmd',
     'docs/images/app-icon.png','docs/images/skin-manager.png','docs/windows-application.md','docs/windows-application-validation.md','docs/pre-release-audit.md',
     'scripts/install.ps1','scripts/manage-background.ps1','scripts/media.ps1','scripts/node-runtime.json',
     'scripts/wallpaper-library.ps1','scripts/wallpaper-preview.ps1','scripts/wallpaper-engine.ps1','scripts/skin-manager.ps1','scripts/skin-manager.xaml',
-    'scripts/manager-launcher.cs','scripts/uninstall-app.ps1','appearance/skin-manager.ico','appearance/wallpaper-engine.png','appearance/apply-wallpaper.png','appearance/confirmation-icon.png',
+    'scripts/manager-launcher.cs','scripts/uninstall-app.ps1','appearance/skin-manager.ico','appearance/chatgpt-app-light.ico','appearance/wallpaper-engine.png','appearance/apply-wallpaper.png','appearance/confirmation-icon.png',
     'scripts/check-upgrade.ps1',
-    'scripts/app-update.ps1','scripts/update-ui.ps1','scripts/finish-update.ps1','scripts/update-public-key.xml',
+    'scripts/app-update.ps1','scripts/update-ui.ps1','scripts/finish-update.ps1','scripts/update-progress.ps1','scripts/update-progress.xaml','scripts/update-public-key.xml',
     'engine/VERSION',
     'engine/assets/demo-background.png','engine/assets/theme.json',
     'engine/assets/selectors.json','engine/assets/safe-css-validator.mjs','engine/assets/safe-css-policy.json',
     'engine/assets/renderer-inject.js','engine/assets/earth-background.css',
     'engine/scripts/video-windows.ps1','engine/scripts/video-server.mjs','engine/scripts/video-blob.mjs',
     'engine/scripts/launch-dream-skin.ps1','engine/scripts/loopback-http.ps1',
+    'engine/scripts/existing-session.ps1','engine/scripts/multi-instance.ps1',
     'engine/scripts/quick-launcher.cs',
     'engine/scripts/validate-safe-css-file.mjs','engine/scripts/theme-windows.ps1','engine/scripts/start-dream-skin.ps1',
     'engine/scripts/restore-dream-skin.ps1','engine/scripts/localization-windows.ps1','engine/scripts/injector.mjs',

@@ -1,6 +1,6 @@
 {
   "name": "codex-dynamic-skin",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Local static and animated backgrounds for the Windows Codex desktop app",
   "type": "module",

@@ -21,7 +21,7 @@ try{
   function Get-Process {
     param($Id,$ErrorAction)
     $timestamp=$started;if($script:recycled){$timestamp=$started.AddSeconds(1)}
-    $handlePath=$runtime;if($script:noHandlePath){$handlePath=$null}
+    $handlePath=$runtime;if($Id -eq 205){$handlePath=Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe'};if($script:noHandlePath){$handlePath=$null}
     $handle=[pscustomobject]@{Id=$Id;Path=$handlePath;StartTime=$timestamp;HasExited=$false}
     $handle|Add-Member ScriptMethod WaitForExit {param($Timeout);return $this.HasExited}
     $handle|Add-Member ScriptMethod Dispose {}
@@ -39,6 +39,21 @@ try{
   Assert (-not(Invoke-DynamicUpgradePreparation $root)) '32-bit Process.Path can be unavailable; verified CIM identity must still permit helper cleanup'
   Assert ($script:stopped.Count -eq 2) 'Verified CIM helpers were not retired when Process.Path was unavailable'
   $script:noHandlePath=$false
+  $monitorScript=Join-Path $root 'engine/scripts/multi-instance.ps1'
+  $monitorExe=Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe'
+  $monitorProcess=[pscustomobject]@{ProcessId=205;ExecutablePath=$monitorExe;CommandLine=('"'+$monitorExe+'" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$monitorScript+'" -StateRoot "'+$root+'"')}
+  $workerProcess=[pscustomobject]@{ProcessId=203;ParentProcessId=205;ExecutablePath=$runtime;CommandLine=('"'+$runtime+'" "'+$injector+'" --watch --port 12912')}
+  $status=@{Monitor=@{Id=205;StartedAt=$started.ToString('o');Executable=$monitorExe;Script=$monitorScript;StateRoot=$root};Workers=@(@{Id=203;StartedAt=$started.ToString('o')})}
+  $status|ConvertTo-Json -Depth 5|Set-Content (Join-Path $root 'multi-instance-status.json') -Encoding UTF8
+  $script:fixtureProcesses=@($originalProcesses)+@($monitorProcess,$workerProcess);$script:stopped=@()
+  Assert (-not(Invoke-DynamicUpgradePreparation $root)) 'Verified monitor and worker must permit upgrade'
+  Assert (($script:stopped -join ',') -eq '205,101,102,203') 'Supervisor must stop before its workers, then all verified helpers must exit'
+  Assert ((Get-FileHash $statePath).Hash -eq $before) 'Multi-instance upgrade altered saved appearance state'
+  $workerProcess.ParentProcessId=999
+  $script:fixtureProcesses=@($originalProcesses)+@($monitorProcess,$workerProcess);$script:stopped=@()
+  Assert ([bool](Invoke-DynamicUpgradePreparation $root)) 'A forged worker parent must block upgrade'
+  Assert ($script:stopped.Count -eq 0) 'Validation must finish before stopping the supervisor'
+  $workerProcess.ParentProcessId=205
   $script:fixtureProcesses=@($originalProcesses)+@([pscustomobject]@{ProcessId=103;ExecutablePath=$runtime;CommandLine=('"'+$runtime+'" -e "setInterval(()=>{},1000)"')})
   $script:stopped=@()
   Assert ([bool](Invoke-DynamicUpgradePreparation $root)) 'Unrecognized runtime process must block upgrade'
