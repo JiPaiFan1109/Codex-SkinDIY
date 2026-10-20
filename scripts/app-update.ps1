@@ -50,7 +50,13 @@ function Read-DynamicSignedUpdate {
 
 function Assert-DynamicUpdateFile {
   param([string]$Path,$Manifest)
-  if((Get-Item -LiteralPath $Path).Length -ne $Manifest.size -or (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -ine $Manifest.sha256){throw '更新包校验失败，原有程序未被替换。'}
+  $stream=[IO.File]::OpenRead($Path);$sha=$null
+  try{
+    if($stream.Length -ne $Manifest.size){throw '更新包校验失败，原有程序未被替换。'}
+    $sha=[Security.Cryptography.SHA256]::Create()
+    $hash=[BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','').ToLowerInvariant()
+    if($hash -ine $Manifest.sha256){throw '更新包校验失败，原有程序未被替换。'}
+  }finally{if($sha){$sha.Dispose()};$stream.Dispose()}
 }
 
 function Get-DynamicUpdateHttpStatus {

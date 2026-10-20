@@ -18,7 +18,7 @@ function Get-DynamicUpgradeBlockReason {
 }
 
 function Invoke-DynamicUpgradePreparation {
-  param([string]$InstallRoot)
+  param([string]$InstallRoot,[switch]$ValidateOnly)
   $root=[IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
   $runtime=Join-Path $root 'engine/runtime/node/node.exe'
   $handles=New-Object 'Collections.Generic.List[object]'
@@ -47,16 +47,33 @@ function Invoke-DynamicUpgradePreparation {
     foreach($record in $records){$record.Executable=$runtime}
     if($monitorProcesses.Count){
       $statusPath=Join-Path $root 'multi-instance-status.json'
-      if(-not(Test-Path -LiteralPath $statusPath) -or (Get-Item $statusPath).Length -gt 64KB){return ($blocked+' 多窗口后台身份记录缺失。')}
-      $status=[IO.File]::ReadAllText($statusPath)|ConvertFrom-Json
-      $monitor=$status.Monitor
+      $status=$null
+      if(Test-Path -LiteralPath $statusPath){
+        if((Get-Item $statusPath).Length -gt 64KB){return ($blocked+' 多窗口后台身份记录超出限制。')}
+        $status=[IO.File]::ReadAllText($statusPath)|ConvertFrom-Json
+      }
       $shells=@((Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe'),(Join-Path $env:WINDIR 'SysWOW64/WindowsPowerShell/v1.0/powershell.exe'))
-      if($monitorProcesses.Count -ne 1 -or -not $monitor -or $shells -inotcontains [string]$monitor.Executable -or
-         [string]$monitor.Script -ine $monitorPath -or [string]$monitor.StateRoot -ine $root -or
-         [int]$monitor.Id -ne [int]$monitorProcesses[0].ProcessId){return ($blocked+' 多窗口后台身份不一致。')}
-      $records+=@{Id=[int]$monitor.Id;Started=$monitor.StartedAt;Script=$monitorPath;SavedScript=$monitorPath;Executable=[string]$monitor.Executable;IsMonitor=$true;Flags=@('-StateRoot',$root)}
-      foreach($worker in @($status.Workers)){
-        $records+=@{Id=[int]$worker.Id;Started=$worker.StartedAt;Script=(Join-Path $root 'engine/scripts/injector.mjs');SavedScript=(Join-Path $root 'engine/scripts/injector.mjs');Executable=$runtime;Flags=@('--watch');ParentId=[int]$monitor.Id}
+      if($monitorProcesses.Count -ne 1){return ($blocked+' 存在多个多窗口后台。')}
+      if($status -and $status.PSObject.Properties.Name -contains 'Monitor'){
+        $monitor=$status.Monitor
+        if(-not $monitor -or $shells -inotcontains [string]$monitor.Executable -or
+           [string]$monitor.Script -ine $monitorPath -or [string]$monitor.StateRoot -ine $root -or
+           [int]$monitor.Id -ne [int]$monitorProcesses[0].ProcessId){return ($blocked+' 多窗口后台身份不一致。')}
+        $records+=@{Id=[int]$monitor.Id;Started=$monitor.StartedAt;Script=$monitorPath;SavedScript=$monitorPath;Executable=[string]$monitor.Executable;IsMonitor=$true;Flags=@('-StateRoot',$root)}
+        foreach($worker in @($status.Workers)){
+          $records+=@{Id=[int]$worker.Id;Started=$worker.StartedAt;Script=(Join-Path $root 'engine/scripts/injector.mjs');SavedScript=(Join-Path $root 'engine/scripts/injector.mjs');Executable=$runtime;Flags=@('--watch');ParentId=[int]$monitor.Id}
+        }
+      }else{
+        # Older builds did not persist identity metadata. Verify live native
+        # creation times and the exact installed script/arguments instead.
+        $monitor=$monitorProcesses[0]
+        if($shells -inotcontains [string]$monitor.ExecutablePath -or -not $monitor.CreationDate){return ($blocked+' 无法核实旧版后台身份。')}
+        $records+=@{Id=[int]$monitor.ProcessId;Started=$monitor.CreationDate;Script=$monitorPath;SavedScript=$monitorPath;Executable=[string]$monitor.ExecutablePath;IsMonitor=$true;NativeTimestamp=$true;Flags=@('-StateRoot',$root)}
+        foreach($worker in @($nodes|Where-Object {[int]$_.ParentProcessId -eq [int]$monitor.ProcessId})){
+          if(@($records|Where-Object {[int]$_.Id -eq [int]$worker.ProcessId}).Count){continue}
+          if(-not $worker.CreationDate -or [datetime]$worker.CreationDate -lt [datetime]$monitor.CreationDate){return ($blocked+' 旧版后台父子进程时间不一致。')}
+          $records+=@{Id=[int]$worker.ProcessId;Started=$worker.CreationDate;Script=(Join-Path $root 'engine/scripts/injector.mjs');SavedScript=(Join-Path $root 'engine/scripts/injector.mjs');Executable=$runtime;NativeTimestamp=$true;Flags=@('--watch','--theme-dir',(Join-Path $root 'active-theme'),'--pause-file',(Join-Path $root 'paused'));ParentId=[int]$monitor.ProcessId}
+        }
       }
     }
     # Validate every runtime occupant before stopping any process. A filename
@@ -71,21 +88,25 @@ function Invoke-DynamicUpgradePreparation {
       $exePattern='(?:"'+[regex]::Escape($record.Executable)+'"|'+[regex]::Escape($record.Executable)+')'
       $scriptPattern='(?:"'+[regex]::Escape($record.Script)+'"|'+[regex]::Escape($record.Script)+')'
       $prefix='\s+'
-      if($record.IsMonitor){$prefix='\s+-NoProfile\s+-WindowStyle\s+Hidden\s+-ExecutionPolicy\s+Bypass\s+-File\s+'}
-      if([string]$process.CommandLine -notmatch ('(?i)^\s*'+$exePattern+$prefix+$scriptPattern+'(?=\s|$)')){return ($blocked+' 后台脚本启动位置不一致。')}
+      $commandLine=([string]$process.CommandLine).Replace('/','\')
+      if($record.IsMonitor){$prefix='\s+-NoProfile\s+(?:-WindowStyle\s+Hidden\s+)?-ExecutionPolicy\s+Bypass\s+-File\s+'}
+      if($commandLine -notmatch ('(?i)^\s*'+$exePattern+$prefix+$scriptPattern+'(?=\s|$)')){return ($blocked+' 后台脚本启动位置不一致。')}
+      if($record.IsMonitor -and $commandLine -notmatch ('(?i)^\s*'+$exePattern+$prefix+$scriptPattern+'\s+-StateRoot\s+(?:"'+[regex]::Escape($root)+'"|'+[regex]::Escape($root)+')\s*$')){return ($blocked+' 多窗口后台启动参数不一致。')}
       foreach($flag in $record.Flags){
-        if([string]$process.CommandLine -notmatch ('(?i)(?:^|[\s"])'+[regex]::Escape($flag)+'(?=$|[\s"])')){return ($blocked+' 后台参数不完整。')}
+        if($commandLine -notmatch ('(?i)(?:^|[\s"])'+[regex]::Escape($flag)+'(?=$|[\s"])')){return ($blocked+' 后台参数不完整。')}
       }
       $handle=Get-Process -Id ([int]$process.ProcessId) -ErrorAction SilentlyContinue
       if(-not $handle){continue}
       $handles.Add($handle)
       $started=if($record.Started -is [datetime]){$record.Started.ToUniversalTime()}else{[datetime]::Parse([string]$record.Started,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()}
-      if($handle.StartTime.ToUniversalTime().Ticks -ne $started.Ticks){return ($blocked+' 进程启动时间发生变化。')}
+      $tolerance=0L;if($record.NativeTimestamp){$tolerance=9L} # CIM timestamps have microsecond precision.
+      if([Math]::Abs($handle.StartTime.ToUniversalTime().Ticks-$started.Ticks) -gt $tolerance){return ($blocked+' 进程启动时间发生变化。')}
       # 32-bit PowerShell cannot read MainModule/Path for a 64-bit node process.
       # CIM already confirmed the executable and argv; keep the native PID/start-time
       # check mandatory, and reject a conflicting handle path when it is available.
       if($handle.Path -and $handle.Path -ine $record.Executable){return ($blocked+' 运行文件路径不一致。')}
     }
+    if($ValidateOnly){return $null}
     foreach($handle in $handles){
       Stop-Process -InputObject $handle -Force -ErrorAction Stop
       if(-not $handle.WaitForExit(10000)){return '换肤后台未能退出，本次安装未替换文件。请退出相关程序后重试。'}

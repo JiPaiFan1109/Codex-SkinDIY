@@ -54,6 +54,26 @@ try{
   Assert ([bool](Invoke-DynamicUpgradePreparation $root)) 'A forged worker parent must block upgrade'
   Assert ($script:stopped.Count -eq 0) 'Validation must finish before stopping the supervisor'
   $workerProcess.ParentProcessId=205
+  # Older monitors wrote connection counts but no process identity section.
+  $legacyMonitor=$monitorProcess.PSObject.Copy()
+  $legacyMonitor|Add-Member NoteProperty CreationDate $started
+  $legacyMonitor.CommandLine=('"'+$monitorExe+'" -NoProfile -ExecutionPolicy Bypass -File "'+$monitorScript.Replace('\','/')+'" -StateRoot "'+$root+'"')
+  $legacyWorker=$workerProcess.PSObject.Copy()
+  $legacyWorker|Add-Member NoteProperty CreationDate $started.AddTicks(4)
+  $legacyWorker.CommandLine=('"'+$runtime+'" "'+$injector+'" --watch --port 12912 --browser-id fixture --theme-dir "'+(Join-Path $root 'active-theme')+'" --pause-file "'+(Join-Path $root 'paused')+'"')
+  @{Enabled=$true;AdditionalWatchers=1}|ConvertTo-Json|Set-Content (Join-Path $root 'multi-instance-status.json') -Encoding UTF8
+  $script:fixtureProcesses=@($originalProcesses)+@($legacyMonitor,$legacyWorker);$script:stopped=@()
+  Assert (-not(Invoke-DynamicUpgradePreparation $root)) 'Legacy monitor without identity metadata must be verified from native process identity'
+  Assert (($script:stopped -join ',') -eq '205,101,102,203') 'Legacy supervisor and every verified helper must exit in order'
+  $legacyWorker.CreationDate=$started.AddSeconds(-1)
+  $script:fixtureProcesses=@($originalProcesses)+@($legacyMonitor,$legacyWorker);$script:stopped=@()
+  Assert ([bool](Invoke-DynamicUpgradePreparation $root)) 'A child predating the claimed supervisor must be rejected'
+  Assert ($script:stopped.Count -eq 0) 'Invalid legacy ownership must not stop any process'
+  $legacyWorker.CreationDate=$started.AddTicks(4)
+  $legacyWorker.CommandLine=('"'+$runtime+'" -e "keepalive" "'+$injector+'" --watch --theme-dir "'+(Join-Path $root 'active-theme')+'" --pause-file "'+(Join-Path $root 'paused')+'"')
+  $script:fixtureProcesses=@($originalProcesses)+@($legacyMonitor,$legacyWorker);$script:stopped=@()
+  Assert ([bool](Invoke-DynamicUpgradePreparation $root)) 'Legacy status must not allow a script path passed as data'
+  Assert ($script:stopped.Count -eq 0) 'Legacy command-line impersonation stopped a process'
   $script:fixtureProcesses=@($originalProcesses)+@([pscustomobject]@{ProcessId=103;ExecutablePath=$runtime;CommandLine=('"'+$runtime+'" -e "setInterval(()=>{},1000)"')})
   $script:stopped=@()
   Assert ([bool](Invoke-DynamicUpgradePreparation $root)) 'Unrecognized runtime process must block upgrade'
