@@ -67,11 +67,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          $draft = gh release view "$env:RELEASE_TAG" --json isDraft --jq '.isDraft' 2>$null
-          if ($LASTEXITCODE -ne 0) {
+          $viewOutput = @(& gh release view "$env:RELEASE_TAG" --json isDraft --jq '.isDraft' 2>&1)
+          $viewExitCode = $LASTEXITCODE
+          if ($viewExitCode -ne 0) {
             gh release create "$env:RELEASE_TAG" --verify-tag --draft --title "Codex 换肤管理中心 $env:RELEASE_TAG" --notes-file (Join-Path 'docs/releases' ($env:RELEASE_TAG+'.md'))
             if ($LASTEXITCODE -ne 0) { throw 'Draft creation failed' }
-          } elseif ($draft -ne 'true') { throw 'Refusing to change an already published release' }
+          } elseif (($viewOutput -join '').Trim() -ne 'true') { throw 'Refusing to change an already published release' }
           gh release upload "$env:RELEASE_TAG" .\dist\Codex-Skin-Manager-Setup.exe .\dist\*.zip .\dist\*.sha256 .\dist\update.json .\dist\update.sig
           if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
           gh release edit "$env:RELEASE_TAG" --draft=false --latest
