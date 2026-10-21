@@ -1,0 +1,175 @@
+﻿[CmdletBinding()]
+param([string]$StateRoot=(Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'))
+
+function Start-DreamSkinInstanceMonitor {
+  param([string]$StateRoot)
+  $scriptPath=Join-Path $PSScriptRoot 'multi-instance.ps1'
+  $args='-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File '+(ConvertTo-DreamSkinProcessArgument $scriptPath)+' -StateRoot '+(ConvertTo-DreamSkinProcessArgument $StateRoot)
+  Start-Process (Join-Path $PSHOME 'powershell.exe') -ArgumentList $args -WindowStyle Hidden | Out-Null
+}
+
+function Write-DreamSkinInstanceStatus {
+  param($Status,[hashtable]$Workers,[string]$StateRoot)
+  $self=[Diagnostics.Process]::GetCurrentProcess()
+  try{
+    $Status|Add-Member -NotePropertyName Monitor -NotePropertyValue @{
+      Id=$PID;StartedAt=$self.StartTime.ToUniversalTime().ToString('o');Executable=$self.MainModule.FileName
+      Script=(Join-Path $PSScriptRoot 'multi-instance.ps1');StateRoot=[IO.Path]::GetFullPath($StateRoot).TrimEnd('\')
+    }
+  }finally{$self.Dispose()}
+  $Status|Add-Member -NotePropertyName Workers -NotePropertyValue @($Workers.Values|ForEach-Object {
+    @{Id=$_.Process.Id;StartedAt=(Get-DreamSkinProcessStartedAt $_.Process.Id)}
+  })
+  Write-DreamSkinUtf8FileAtomically -Path (Join-Path $StateRoot 'multi-instance-status.json') -Content ($Status|ConvertTo-Json -Depth 5)
+}
+
+function Get-DreamSkinInstanceEndpoints {
+  param([object[]]$Installs,[object[]]$Processes,[hashtable]$Cache)
+  $seen=@{};$result=@()
+  foreach($install in $Installs){
+    $matching=@($Processes|Where-Object {Test-DreamSkinPathEqual $_.ExecutablePath $install.Executable})
+    foreach($process in @(Get-DreamSkinCodexMainProcesses $matching)){
+      $match=[regex]::Match([string]$process.CommandLine,'(?:^|\s)"?--remote-debugging-port(?:=|\s+)([0-9]{4,5})"?(?=\s|$)')
+      if(-not $match.Success){continue}
+      $port=[int]$match.Groups[1].Value
+      if($port -lt 1024 -or $port -gt 65535 -or $seen.ContainsKey($port)){continue}
+      $cacheKey="$($process.ProcessId)|$($process.CreationDate)|$port|$($install.Executable)"
+      $identity=$null
+      if($Cache -and $Cache.ContainsKey($cacheKey) -and $Cache[$cacheKey].Until -gt [datetime]::UtcNow){$identity=$Cache[$cacheKey].Identity}
+      else{
+        $identity=Get-DreamSkinVerifiedCdpIdentity -Port $port -Codex $install
+        if($null -ne $Cache -and $identity){$Cache[$cacheKey]=@{Identity=$identity;Until=[datetime]::UtcNow.AddSeconds(10)}}
+      }
+      if(-not $identity){continue}
+      $seen[$port]=$true
+      $result += [pscustomobject]@{Key=([string]$port+':'+$identity.BrowserId);Port=$port;BrowserId=$identity.BrowserId;Codex=$install}
+    }
+  }
+  return $result
+}
+
+function Stop-DreamSkinInstanceWorker {
+  param($Worker,[switch]$Remove)
+  # Only this supervisor's child Process object is ever stopped. No Codex process is terminated.
+  if(-not $Worker.Process.HasExited){$Worker.Process.Kill();$Worker.Process.WaitForExit(3000)|Out-Null}
+  if($Remove){
+    $identity=Get-DreamSkinVerifiedCdpIdentity -Port $Worker.Endpoint.Port -Codex $Worker.Endpoint.Codex
+    if($identity -and $identity.BrowserId -ceq $Worker.Endpoint.BrowserId){
+      $null=Invoke-DreamSkinNative -FilePath $Worker.Node -ArgumentList @($Worker.Injector,'--remove','--port',[string]$Worker.Endpoint.Port,'--browser-id',$Worker.Endpoint.BrowserId,'--timeout-ms','3000') -DiscardStderr
+    }
+  }
+  $Worker.Process.Dispose()
+}
+
+function Invoke-DreamSkinInstanceMonitor {
+  param([string]$StateRoot,[int]$MaxCycles=0,[int]$PollMilliseconds=2000)
+  $sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $sha=[Security.Cryptography.SHA256]::Create()
+  try{$rootKey=[BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes([IO.Path]::GetFullPath($StateRoot).ToLowerInvariant()))).Replace('-','').Substring(0,16)}finally{$sha.Dispose()}
+  $mutex=[Threading.Mutex]::new($false,"Local\CodexDynamicSkin.$sid.InstanceMonitor.$rootKey")
+  $acquired=$false
+  try{$acquired=$mutex.WaitOne(0)}catch [Threading.AbandonedMutexException]{$acquired=$true}
+  if(-not $acquired){$mutex.Dispose();return}
+  $workers=@{};$failures=@{};$lastState=$null;$lastError=$null;$endpointCache=@{};$installRefresh=[datetime]::MinValue
+  $lastVideoAvailable=$null;$videoRetryAt=[datetime]::MinValue
+  $logDir=Join-Path $StateRoot 'logs/multi-instance';[IO.Directory]::CreateDirectory($logDir)|Out-Null
+  try{
+    $cycle=0
+    while($MaxCycles -eq 0 -or $cycle -lt $MaxCycles){
+      $cycle++
+      $operation=$null
+      try{
+        try{$operation=Enter-DreamSkinOperationLock}catch{Start-Sleep -Seconds 2;continue}
+        $state=Read-DreamSkinState -Path (Join-Path $StateRoot 'state.json')
+        if(-not $state){
+          foreach($key in @($workers.Keys)){Stop-DreamSkinInstanceWorker $workers[$key] -Remove;$workers.Remove($key)}
+          $lastState=$null
+          $lastVideoAvailable=$null;$videoRetryAt=[datetime]::MinValue
+          $status=[pscustomobject]@{UpdatedAt=[datetime]::UtcNow.ToString('o');Enabled=$false;VerifiedConnections=0;AdditionalWatchers=0;Ports=@();ProcessesWithoutConnection=@()}
+          Write-DreamSkinInstanceStatus $status $workers $StateRoot
+        }else{
+          # All instances follow the same committed theme; a new apply restarts children with new video metadata.
+          $revision=([IO.File]::ReadAllText((Join-Path $StateRoot 'state.json')))
+          if($lastState -and $revision -cne $lastState){
+            foreach($key in @($workers.Keys)){Stop-DreamSkinInstanceWorker $workers[$key];$workers.Remove($key)}
+            $videoRetryAt=[datetime]::MinValue
+          }
+          $lastState=$revision
+          if([datetime]::UtcNow -ge $installRefresh){$installs=@(Get-DreamSkinRegisteredCodexInstalls);$installRefresh=[datetime]::UtcNow.AddSeconds(60)}
+          foreach($cacheKey in @($endpointCache.Keys)){if($endpointCache[$cacheKey].Until -lt [datetime]::UtcNow){$endpointCache.Remove($cacheKey)}}
+          $processes=@(Get-CimInstance Win32_Process -Filter "Name = 'ChatGPT.exe'")
+          $endpoints=@(Get-DreamSkinInstanceEndpoints $installs $processes $endpointCache)
+          $node=Join-Path $StateRoot 'engine/runtime/node/node.exe';$injector=Join-Path $PSScriptRoot 'injector.mjs'
+          $videoAvailable=$false
+          if($state.videoPid -and $endpoints.Count -gt 0){
+            $video=Get-Process -Id $state.videoPid -ErrorAction SilentlyContinue
+            $videoAlive=$video -and (Test-DreamSkinPathEqual $video.Path $node) -and ((Get-DreamSkinProcessStartedAt $video.Id) -ceq $state.videoStartedAt)
+            $videoAvailable=[bool]$videoAlive
+            if(-not $videoAlive -and [datetime]::UtcNow -ge $videoRetryAt){
+              $videoRetryAt=[datetime]::UtcNow.AddSeconds(15)
+              try {
+              # Recover the shared video service after logout/reboot without reopening any Codex window.
+              . (Join-Path $PSScriptRoot 'video-windows.ps1')
+              $videoPaths=Get-DreamSkinVideoPaths $StateRoot
+              $recovered=Start-DreamSkinVideoServer -NodePath $node -ServerScript $videoPaths.Server -ConfigPath $videoPaths.Config -ReadyPath $videoPaths.Ready -StdoutPath $videoPaths.Stdout -StderrPath $videoPaths.Stderr -TimeoutSeconds 10
+              foreach($key in @($workers.Keys)){Stop-DreamSkinInstanceWorker $workers[$key];$workers.Remove($key)}
+              $null=Stop-DreamSkinRecordedInjector -State $state
+              $state.videoPid=$recovered.Process.Id;$state.videoStartedAt=$recovered.StartedAt
+              Write-DreamSkinState -Path (Join-Path $StateRoot 'state.json') -State $state
+              $lastState=[IO.File]::ReadAllText((Join-Path $StateRoot 'state.json'))
+              $videoAvailable=$true
+              } catch {
+                [IO.File]::AppendAllText((Join-Path $logDir 'monitor-error.log'),[datetime]::UtcNow.ToString('o')+' Video unavailable; using static background while retrying: '+$_.Exception.Message+[Environment]::NewLine)
+              }
+            }
+          }
+          if($null -ne $lastVideoAvailable -and $lastVideoAvailable -ne $videoAvailable){
+            foreach($key in @($workers.Keys)){Stop-DreamSkinInstanceWorker $workers[$key];$workers.Remove($key)}
+          }
+          if($state.videoPid -and -not $videoAvailable -and $endpoints.Count -gt 0){
+            $null=Stop-DreamSkinRecordedInjector -State $state
+          }
+          $lastVideoAvailable=$videoAvailable
+          $primary=Get-Process -Id $state.injectorPid -ErrorAction SilentlyContinue
+          $primaryAlive=$primary -and (Test-DreamSkinPathEqual $primary.Path $node) -and ((Get-DreamSkinProcessStartedAt $primary.Id) -ceq $state.injectorStartedAt)
+          $wanted=@{}
+          foreach($endpoint in $endpoints){
+            if($primaryAlive -and $endpoint.Port -eq $state.port -and $endpoint.BrowserId -ceq $state.browserId){continue}
+            $wanted[$endpoint.Key]=$endpoint
+          }
+          foreach($key in @($workers.Keys)){
+            if(-not $wanted.ContainsKey($key) -or $workers[$key].Process.HasExited){
+              Stop-DreamSkinInstanceWorker $workers[$key];$workers.Remove($key)
+              $failures[$key]=[datetime]::UtcNow.AddSeconds(5)
+            }
+          }
+          foreach($key in $wanted.Keys){
+            if($workers.ContainsKey($key) -or ($failures.ContainsKey($key) -and [datetime]::UtcNow -lt $failures[$key])){continue}
+            $endpoint=$wanted[$key]
+            $args=@((ConvertTo-DreamSkinProcessArgument $injector),'--watch','--port',[string]$endpoint.Port,'--browser-id',$endpoint.BrowserId,'--theme-dir',(ConvertTo-DreamSkinProcessArgument (Join-Path $StateRoot 'active-theme')),'--pause-file',(ConvertTo-DreamSkinProcessArgument (Join-Path $StateRoot 'paused')))
+            if($videoAvailable){$args+=@('--video-state',(ConvertTo-DreamSkinProcessArgument (Join-Path $StateRoot 'video-ready.json')))}
+            $child=Start-Process $node -ArgumentList $args -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logDir ($endpoint.Port.ToString()+'.log')) -RedirectStandardError (Join-Path $logDir ($endpoint.Port.ToString()+'-error.log'))
+            $workers[$key]=@{Process=$child;Endpoint=$endpoint;Node=$node;Injector=$injector}
+          }
+          $registeredProcesses=@($processes|Where-Object {$candidate=$_;@($installs|Where-Object {Test-DreamSkinPathEqual $_.Executable $candidate.ExecutablePath}).Count -gt 0})
+          $unavailable=@(Get-DreamSkinCodexMainProcesses $registeredProcesses|Where-Object {$_.CommandLine -notmatch '--remote-debugging-port(?:=|\s+)\d+'}|ForEach-Object {$_.ProcessId})
+          $status=[pscustomobject]@{UpdatedAt=[datetime]::UtcNow.ToString('o');Enabled=$true;VideoFallback=[bool]($state.videoPid -and -not $videoAvailable);VerifiedConnections=$endpoints.Count;AdditionalWatchers=$workers.Count;Ports=@($endpoints|ForEach-Object {$_.Port});ProcessesWithoutConnection=$unavailable}
+          Write-DreamSkinInstanceStatus $status $workers $StateRoot
+          $lastError=$null
+        }
+      }catch{
+        $message=$_.Exception.Message
+        if($message -ne $lastError){[IO.File]::AppendAllText((Join-Path $logDir 'monitor-error.log'),[datetime]::UtcNow.ToString('o')+' '+$message+[Environment]::NewLine);$lastError=$message}
+      }finally{if($operation){Exit-DreamSkinOperationLock $operation}}
+      Start-Sleep -Milliseconds $PollMilliseconds
+    }
+  }finally{
+    foreach($key in @($workers.Keys)){Stop-DreamSkinInstanceWorker $workers[$key]}
+    $mutex.ReleaseMutex();$mutex.Dispose()
+  }
+}
+
+if($MyInvocation.InvocationName -ne '.') {
+  . (Join-Path $PSScriptRoot 'common-windows.ps1')
+  Invoke-DreamSkinInstanceMonitor $StateRoot
+}

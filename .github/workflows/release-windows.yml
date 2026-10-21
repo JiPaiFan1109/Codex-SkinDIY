@@ -6,7 +6,7 @@ on:
       tag:
         description: Existing release tag to build and upload
         required: true
-        default: v0.2.0
+        default: v1.1.0
 
 permissions:
   contents: write
@@ -42,18 +42,37 @@ jobs:
         run: |
           & .\dist\app-package\engine\runtime\node\node.exe --test tests/*.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Node tests failed' }
-          foreach ($test in @('codex-connection.tests.ps1','distribution-cleanup.tests.ps1','uninstall-app.tests.ps1','app-package.tests.ps1')) {
+          foreach ($test in @('codex-connection.tests.ps1','distribution-cleanup.tests.ps1','uninstall-app.tests.ps1','app-package.tests.ps1','app-update.tests.ps1','update-flow.tests.ps1','update-ui.tests.ps1','update-staging.tests.ps1','update-progress.tests.ps1','upgrade-helper-cleanup.tests.ps1','upgrade-multi-live.tests.ps1','multi-instance.tests.ps1','apply-clarity.tests.ps1')) {
             & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File (Join-Path tests $test)
             if ($LASTEXITCODE -ne 0) { throw "Application test failed: $test" }
           }
           & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File installer/verify-setup.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Setup lifecycle test failed' }
 
-      - name: Upload release assets
+      - name: Sign and verify update manifest
+        shell: powershell
+        env:
+          UPDATE_SIGNING_KEY_XML: ${{ secrets.UPDATE_SIGNING_KEY_XML }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if (-not $env:UPDATE_SIGNING_KEY_XML) { throw 'Missing update signing key' }
+          if ($env:RELEASE_TAG -cne ('v'+(Get-Content VERSION -Raw).Trim())) { throw 'Tag does not match VERSION' }
+          $notes = Join-Path 'docs/releases' ($env:RELEASE_TAG+'-app-notes.txt')
+          if (-not (Test-Path $notes)) { $notes = Join-Path 'docs/releases' ($env:RELEASE_TAG+'.md') }
+          .\scripts\sign-update.ps1 -OutputDirectory .\dist -NotesPath $notes
+
+      - name: Upload assets to a draft, then publish
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          gh release upload "$env:RELEASE_TAG" .\dist\Codex-Skin-Manager-Setup.exe .\dist\*.zip .\dist\*.sha256
+          $draft = gh release view "$env:RELEASE_TAG" --json isDraft --jq '.isDraft' 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "$env:RELEASE_TAG" --verify-tag --draft --title "Codex 换肤管理中心 $env:RELEASE_TAG" --notes-file (Join-Path 'docs/releases' ($env:RELEASE_TAG+'.md'))
+            if ($LASTEXITCODE -ne 0) { throw 'Draft creation failed' }
+          } elseif ($draft -ne 'true') { throw 'Refusing to change an already published release' }
+          gh release upload "$env:RELEASE_TAG" .\dist\Codex-Skin-Manager-Setup.exe .\dist\*.zip .\dist\*.sha256 .\dist\update.json .\dist\update.sig
           if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
+          gh release edit "$env:RELEASE_TAG" --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }

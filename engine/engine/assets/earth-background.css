@@ -1,0 +1,60 @@
+/* Local wallpaper background: keep native layout, fonts, controls and interaction. */
+html[data-dream-skin="active"] body {
+  position: relative;
+  isolation: isolate;
+  background: transparent !important;
+}
+html[data-dream-skin="active"] #codex-dream-skin-video-frame,
+html[data-dream-skin="active"] #codex-dream-skin-image,
+html[data-dream-skin="active"] #codex-dream-skin-video-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+html[data-dream-skin="active"] #codex-dream-skin-video-frame,
+html[data-dream-skin="active"] #codex-dream-skin-image {
+  z-index: -2;
+  border: 0;
+  object-fit: cover;
+  object-position: center;
+  opacity: 1;
+  filter: brightness(.8);
+}
+html[data-dream-skin="active"] #codex-dream-skin-video-overlay {
+  z-index: -1;
+  background: rgb(3 8 18 / .58);
+}
+html[data-dream-skin="active"] :is(main.main-surface, [data-app-shell-main-surface], [class*="_MainContentSurface_"], [data-ds-part="main"], [data-ds-part="home"], .thread-scroll-container) {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+html[data-dream-skin="active"] :is(aside.app-shell-left-panel, [data-ds-part="sidebar"]) {
+  background: rgb(8 15 26 / .5) !important;
+}
+html[data-dream-skin="active"] :is([data-ds-part="header"], [class*="_ApplicationMenuTopBar_"], [data-app-shell-header-edge-scroll]) {
+  background: rgb(8 15 26 / .28) !important;
+}
+html[data-dream-skin="active"] :is([data-ds-part="composer"], .composer-surface-chrome, [class*="_ComposerLayoutRoot_"]) {
+  background: rgb(10 18 30 / .7) !important;
+}
+html[data-dream-skin="active"] :is(.group\/home-suggestions button, [data-ds-part="message"]) {
+  background-color: rgb(8 15 26 / .34) !important;
+}
+/* Keep native dark text readable when Codex uses its light appearance. */
+html[data-dream-skin="active"][data-dream-shell="light"] #codex-dream-skin-video-overlay {
+  background: rgb(255 255 255 / .76);
+}
+html[data-dream-skin="active"][data-dream-shell="light"] :is(aside.app-shell-left-panel, [data-ds-part="sidebar"]) {
+  background: rgb(255 255 255 / .5) !important;
+}
+html[data-dream-skin="active"][data-dream-shell="light"] :is([data-ds-part="header"], [class*="_ApplicationMenuTopBar_"], [data-app-shell-header-edge-scroll]) {
+  background: rgb(255 255 255 / .28) !important;
+}
+html[data-dream-skin="active"][data-dream-shell="light"] :is([data-ds-part="composer"], .composer-surface-chrome, [class*="_ComposerLayoutRoot_"]) {
+  background: rgb(255 255 255 / .7) !important;
+}
+html[data-dream-skin="active"][data-dream-shell="light"] :is(.group\/home-suggestions button, [data-ds-part="message"]) {
+  background-color: rgb(255 255 255 / .34) !important;
+}

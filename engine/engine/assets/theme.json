@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "id": "preset-neutral",
+  "name": "Night Sky",
+  "image": "demo-background.png",
+  "appearance": "auto"
+}

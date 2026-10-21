@@ -1,0 +1,74 @@
+name: Windows UX regression review
+on:
+  push:
+    branches: ['codex/windows-release-audit', 'codex/upgrade-helper-cleanup', 'codex/in-app-updates']
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  cleanup-contract:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check upgrade identity contract
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File tests/upgrade-helper-cleanup.tests.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Upgrade helper identity regression failed' }
+  regressions:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Node regressions
+        run: node --test tests/*.test.mjs
+      - name: Prepare pinned runtime for Windows checks
+        if: always()
+        shell: powershell
+        run: |
+          .\scripts\build-release.ps1 -OutputDirectory .\dist
+          Expand-Archive .\dist\*.zip .\dist\package
+          Copy-Item .\dist\package\engine\runtime -Destination .\engine -Recurse
+      - name: Windows regressions
+        if: always()
+        shell: powershell
+        run: |
+          $failed = @()
+          foreach ($test in @('start-cancellation.tests.ps1','start-watcher-health.tests.ps1','ux-cancellation.tests.ps1','upgrade-preflight.tests.ps1','upgrade-helper-cleanup.tests.ps1','media-restore.tests.ps1','restore-result.tests.ps1','wallpaper-actions.tests.ps1','skin-manager.tests.ps1','manager-error.tests.ps1','uninstall-app.tests.ps1','no-config-mutation.ps1','distribution-cleanup.tests.ps1','app-update.tests.ps1','update-flow.tests.ps1','update-ui.tests.ps1')) {
+            & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File (Join-Path tests $test)
+            if ($LASTEXITCODE -ne 0) { $failed += $test }
+          }
+          if ($failed.Count) { throw ('Failed: '+($failed -join ', ')) }
+      - name: Install pinned compiler in the hosted VM
+        shell: powershell
+        run: |
+          New-Item .tools/inno -ItemType Directory -Force | Out-Null
+          $download = '.tools/inno/compiler-setup.exe'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe' -OutFile $download
+          if ((Get-FileHash $download).Hash -ine '0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f') { throw 'Compiler checksum mismatch' }
+          if ((Get-AuthenticodeSignature $download).Status -ne 'Valid') { throw 'Compiler signature mismatch' }
+          $directory = Join-Path (Get-Location) '.tools/inno/compiler'
+          $process = Start-Process -FilePath $download -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER',('/DIR="'+$directory+'"')) -WindowStyle Hidden -PassThru
+          $process.WaitForExit()
+          if ($process.ExitCode -ne 0) { throw 'Compiler setup failed' }
+      - name: Build setup and verify active-runtime upgrade
+        shell: powershell
+        run: |
+          .\scripts\build-app.ps1 -NodeRuntimePath .\engine\runtime\node\node.exe -OutputDirectory .\dist\application
+          & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File tests/app-package.tests.ps1 -SetupPath .\dist\application\Codex-Skin-Manager-Setup.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Setup package checks failed' }
+          & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File installer/verify-setup.ps1 -PackagePath (Join-Path (Get-Location) 'dist/application/app-package')
+          if ($LASTEXITCODE -ne 0) { throw 'Real setup lifecycle checks failed' }
+      - name: Preserve the verified installer and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ux-reviewed-application
+          path: |
+            dist/application/*.exe
+            dist/application/*.zip
+            dist/application/*.sha256
+          retention-days: 7
