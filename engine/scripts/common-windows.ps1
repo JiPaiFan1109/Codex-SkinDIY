@@ -1,4 +1,5 @@
-﻿. (Join-Path $PSScriptRoot 'config-utf8.ps1')
+﻿. (Join-Path $PSScriptRoot 'loopback-http.ps1')
+. (Join-Path $PSScriptRoot 'config-utf8.ps1')
 
 $script:DreamSkinStartResultCategories = @(
   'none',
@@ -534,7 +535,14 @@ function ConvertTo-DreamSkinCodexInstall {
 }
 
 function Get-DreamSkinRegisteredCodexInstalls {
-  $packages = @(Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop | Sort-Object Version -Descending)
+  $packages = @()
+  try { $packages = @(Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction Stop) } catch { }
+  if($packages.Count -eq 0){
+    # Use the same discovery for launch, restore and endpoint ownership checks.
+    # Enumerating the current user's registrations also handles a failed name query.
+    $packages = @(Get-AppxPackage -ErrorAction Stop | Where-Object Name -eq 'OpenAI.Codex')
+  }
+  $packages = @($packages | Sort-Object Version -Descending)
   $installs = @()
   foreach ($package in $packages) {
     $install = ConvertTo-DreamSkinCodexInstall -Package $package
@@ -544,9 +552,83 @@ function Get-DreamSkinRegisteredCodexInstalls {
 }
 
 function Get-DreamSkinCodexInstall {
-  $installs = @(Get-DreamSkinRegisteredCodexInstalls)
-  if ($installs.Count -eq 0) { throw 'The official OpenAI.Codex Store package is not installed or its identity cannot be validated.' }
+  $installs = @()
+  $discoveryError=$null
+  try { $installs = @(Get-DreamSkinRegisteredCodexInstalls) } catch { $discoveryError=$_.Exception.Message }
+  if ($installs.Count -eq 0) {
+    $manualPath = Join-Path (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin') 'codex-manual.json'
+    if (Test-Path -LiteralPath $manualPath -PathType Leaf) {
+      try {
+        $manual = Read-DreamSkinUtf8File -Path $manualPath | ConvertFrom-Json -ErrorAction Stop
+        $candidate = "$($manual.Executable)"
+        if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+          $packageFullName = "$($manual.PackageFullName)"
+          $package = @(Get-AppxPackage -ErrorAction Stop | Where-Object PackageFullName -eq $packageFullName)
+          foreach ($item in $package) {
+            $install = ConvertTo-DreamSkinCodexInstall -Package $item
+            if ($install -and (Test-DreamSkinPathEqual -Left $install.Executable -Right $candidate)) { return $install }
+          }
+        }
+      } catch { }
+    }
+    if($discoveryError){throw ('无法读取当前 Windows 用户的 Codex 商店注册信息：'+$discoveryError)}
+    throw '未找到当前 Windows 用户可用的官方 Codex 商店安装。请确认 Codex 已安装完成，并使用安装 Codex 的同一 Windows 账户运行。'
+  }
   return $installs[0]
+}
+
+function Resolve-DreamSkinCodexManualSelection {
+  param([Parameter(Mandatory = $true)][string]$Path)
+  $selected = [IO.Path]::GetFullPath($Path)
+  if (-not (Test-Path -LiteralPath $selected -PathType Leaf)) { throw '所选文件不存在，请重新选择 Codex 快捷方式或 ChatGPT.exe。' }
+  $extension = [IO.Path]::GetExtension($selected).ToLowerInvariant()
+  if ($extension -notin @('.lnk', '.exe')) { throw '请选择 Codex 快捷方式或 Codex 安装目录中的 ChatGPT.exe。' }
+  $target = $selected
+  $aumid = $null
+  if ($extension -eq '.lnk') {
+    # Store shortcuts often use a shell ID list rather than an EXE target.
+    $appShell=$null;$folder=$null;$item=$null
+    try {
+      $appShell=New-Object -ComObject Shell.Application
+      $folder=$appShell.Namespace((Split-Path $selected -Parent))
+      $item=$folder.ParseName((Split-Path $selected -Leaf))
+      $aumid=[string]$item.ExtendedProperty('System.AppUserModel.ID')
+    } catch { } finally {
+      foreach($com in @($item,$folder,$appShell)){if($null -ne $com -and [Runtime.InteropServices.Marshal]::IsComObject($com)){[void][Runtime.InteropServices.Marshal]::ReleaseComObject($com)}}
+    }
+    $shell = New-Object -ComObject WScript.Shell
+    try {
+      $shortcut = $shell.CreateShortcut($selected)
+      $target = "$($shortcut.TargetPath)"
+      $arguments = "$($shortcut.Arguments)"
+      $aumidMatch = [regex]::Match($arguments, '(?i)(?:shell:AppsFolder\\)?(?<id>OpenAI\.Codex_[A-Za-z0-9]+!\w+)')
+      if ($aumidMatch.Success) { $aumid = $aumidMatch.Groups['id'].Value }
+    } finally {
+      if($shortcut){[void][Runtime.InteropServices.Marshal]::ReleaseComObject($shortcut)}
+      [Runtime.InteropServices.Marshal]::ReleaseComObject($shell) | Out-Null
+    }
+  }
+  $installs = @(Get-DreamSkinRegisteredCodexInstalls)
+  if ($aumid) {
+    $match = @($installs | Where-Object AppUserModelId -ceq $aumid)
+    if ($match.Count -eq 1) { return $match[0] }
+  }
+  if ($target) {
+    $match = @($installs | Where-Object { Test-DreamSkinPathEqual -Left $_.Executable -Right $target })
+    if ($match.Count -eq 1) { return $match[0] }
+  }
+  throw '无法验证所选文件属于官方 OpenAI Codex 商店包。请重新选择 Codex 快捷方式或其 ChatGPT.exe。'
+}
+
+function Write-DreamSkinManualCodexSelection {
+  param([Parameter(Mandatory = $true)][string]$StateRoot,[Parameter(Mandatory = $true)][object]$Install)
+  if (-not $Install.Executable -or -not $Install.PackageFullName -or -not $Install.AppUserModelId) { throw '所选 Codex 身份不完整。' }
+  $root = [IO.Path]::GetFullPath($StateRoot)
+  Ensure-DreamSkinManagedDirectory -Path $root -Root $root
+  $path = Join-Path $root 'codex-manual.json'
+  $payload = [pscustomobject]@{Executable="$($Install.Executable)";PackageFullName="$($Install.PackageFullName)";AppUserModelId="$($Install.AppUserModelId)";SavedAtUtc=[datetime]::UtcNow.ToString('o')}
+  Write-DreamSkinUtf8FileAtomically -Path $path -Content (($payload | ConvertTo-Json -Compress) + "`r`n")
+  return $Install
 }
 
 function Initialize-DreamSkinPackageLauncher {
@@ -697,7 +779,7 @@ function Start-DreamSkinCodexForDebugging {
   }
   $packageProcessId = Start-DreamSkinCodex -Codex $Codex -Arguments $Arguments
   $packageStatus = Wait-DreamSkinCodexDebugArgumentStatus -Codex $Codex -Port $Port
-  if ($packageStatus -ne 'protocol-redirected') {
+  if ($packageStatus -notin @('protocol-redirected','not-forwarded')) {
     return [pscustomobject]@{
       ProcessId = $packageProcessId
       Strategy = 'package-activation'
@@ -724,7 +806,7 @@ function Start-DreamSkinCodexForDebugging {
       'cdp-launch-failed'
     }
     throw (New-DreamSkinStartException -Category $category `
-      -Message "Codex $($Codex.Version) converted the CDP argument into a codex:// navigation path. Direct launch of the validated Store executable failed ($failureKind), so this Codex/Windows combination cannot expose the Dream Skin debugging endpoint without modifying the protected app package." `
+      -Message "Codex $($Codex.Version) did not retain the CDP argument during package activation. Direct launch of the validated Store executable failed ($failureKind), so this Codex/Windows combination cannot expose the Dream Skin debugging endpoint without modifying the protected app package." `
       -InnerException $_.Exception)
   }
 
@@ -844,8 +926,7 @@ function Test-DreamSkinCdpPageTarget {
 function Get-DreamSkinCdpTargets {
   param([int]$Port)
   try {
-    $targets = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/list" -TimeoutSec 2 `
-      -MaximumRedirection 0 -ErrorAction Stop
+    $targets = Invoke-DreamSkinLoopbackJson -Port $Port -Resource '/json/list'
     return @($targets | Where-Object { Test-DreamSkinCdpPageTarget -Target $_ -Port $Port })
   } catch {
     return @()
@@ -860,8 +941,7 @@ function Test-DreamSkinBrowserId {
 function Get-DreamSkinCdpBrowserIdentity {
   param([int]$Port)
   try {
-    $version = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/json/version" -TimeoutSec 2 `
-      -MaximumRedirection 0 -ErrorAction Stop
+    $version = Invoke-DreamSkinLoopbackJson -Port $Port -Resource '/json/version'
     $webSocketUrl = "$($version.webSocketDebuggerUrl)"
     if (-not (Test-DreamSkinWebSocketUrl -Value $webSocketUrl -Port $Port)) { return $null }
     $uri = [Uri]$webSocketUrl
@@ -881,10 +961,82 @@ function Get-DreamSkinCdpBrowserIdentity {
 
 function Get-DreamSkinPortListeners {
   param([int]$Port)
-  if (-not (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue)) {
-    throw 'Get-NetTCPConnection is required to verify CDP listener ownership.'
+  if (-not ('CodexDynamicSkin.TcpListeners' -as [type])) {
+    # Query fresh IPv4 AND IPv6 owner tables without NetTCPIP/CIM startup cost.
+    # No result cache: ownership is checked again after the CDP handshake.
+    Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Net;
+using System.Runtime.InteropServices;
+namespace CodexDynamicSkin {
+  public sealed class TcpListenerInfo {
+    public string LocalAddress { get; set; }
+    public int LocalPort { get; set; }
+    public uint OwningProcess { get; set; }
   }
-  return @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
+  public static class TcpListeners {
+    [DllImport("iphlpapi.dll")]
+    static extern uint GetExtendedTcpTable(IntPtr table, ref int size,
+      [MarshalAs(UnmanagedType.Bool)] bool sort, uint family, int tableClass, uint reserved);
+    [StructLayout(LayoutKind.Sequential)]
+    struct Row4 {
+      public uint State, LocalAddress, LocalPort, RemoteAddress, RemotePort, Pid;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    struct Row6 {
+      [MarshalAs(UnmanagedType.ByValArray, SizeConst=16)] public byte[] LocalAddress;
+      public uint LocalScope, LocalPort;
+      [MarshalAs(UnmanagedType.ByValArray, SizeConst=16)] public byte[] RemoteAddress;
+      public uint RemoteScope, RemotePort, State, Pid;
+    }
+    static int Port(uint raw) { return (int)(((raw & 255) << 8) | ((raw >> 8) & 255)); }
+    static void Read(uint family, int port, List<TcpListenerInfo> result) {
+      int size = 0;
+      uint error = GetExtendedTcpTable(IntPtr.Zero, ref size, false, family, 3, 0);
+      if (error != 0 && error != 122) throw new Win32Exception((int)error);
+      for (int attempt = 0; attempt < 4; attempt++) {
+        int capacity = Math.Max(size, 4);
+        IntPtr buffer = Marshal.AllocHGlobal(capacity);
+        try {
+          error = GetExtendedTcpTable(buffer, ref size, false, family, 3, 0);
+          if (error == 122) continue; // Table grew between size and data queries.
+          if (error != 0) throw new Win32Exception((int)error);
+          int count = Marshal.ReadInt32(buffer);
+          int stride = Marshal.SizeOf(family == 2 ? typeof(Row4) : typeof(Row6));
+          if (count < 0 || count > (capacity - 4) / stride) throw new InvalidOperationException("Invalid TCP owner table size");
+          for (int i = 0; i < count; i++) {
+            IntPtr row = IntPtr.Add(buffer, 4 + i * stride);
+            if (family == 2) {
+              Row4 value = (Row4)Marshal.PtrToStructure(row, typeof(Row4));
+              if (Port(value.LocalPort) == port) result.Add(new TcpListenerInfo {
+                LocalAddress = new IPAddress(BitConverter.GetBytes(value.LocalAddress)).ToString(),
+                LocalPort = port, OwningProcess = value.Pid });
+            } else {
+              Row6 value = (Row6)Marshal.PtrToStructure(row, typeof(Row6));
+              if (Port(value.LocalPort) == port) result.Add(new TcpListenerInfo {
+                LocalAddress = new IPAddress(value.LocalAddress, value.LocalScope).ToString(),
+                LocalPort = port, OwningProcess = value.Pid });
+            }
+          }
+          return;
+        } finally { Marshal.FreeHGlobal(buffer); }
+      }
+      throw new Win32Exception((int)error);
+    }
+    public static TcpListenerInfo[] Get(int port) {
+      if (port < 1 || port > 65535) throw new ArgumentOutOfRangeException("port");
+      var result = new List<TcpListenerInfo>();
+      Read(2, port, result);
+      Read(23, port, result);
+      return result.ToArray();
+    }
+  }
+}
+'@
+  }
+  return @([CodexDynamicSkin.TcpListeners]::Get($Port))
 }
 
 function Test-DreamSkinPortAvailable {
@@ -898,8 +1050,16 @@ function Test-DreamSkinCodexPortOwner {
   if ($listeners.Count -eq 0) { return $false }
   foreach ($listener in $listeners) {
     if ($listener.LocalAddress -notin @('127.0.0.1', '::1')) { return $false }
-    $process = Get-CimInstance Win32_Process -Filter "ProcessId = $([int]$listener.OwningProcess)" -ErrorAction SilentlyContinue
-    $processPath = if ($process) { Get-DreamSkinProcessExecutablePath -ProcessInfo $process } else { $null }
+    $process = $null
+    $processPath = $null
+    try {
+      $process = Get-Process -Id ([int]$listener.OwningProcess) -ErrorAction Stop
+      $processPath = $process.Path
+    } catch {
+      return $false
+    } finally {
+      if ($process) { $process.Dispose() }
+    }
     if (-not $processPath -or -not (Test-DreamSkinPathEqual -Left $processPath -Right $Codex.Executable)) {
       return $false
     }
@@ -1164,7 +1324,7 @@ function Stop-DreamSkinCodex {
 function Confirm-DreamSkinRestart {
   param([string]$Message)
   $shell = New-Object -ComObject WScript.Shell
-  return $shell.Popup($Message, 0, 'Codex Dream Skin', 52) -eq 6
+  return $shell.Popup($Message, 0, 'Codex 换肤管理中心', 52) -eq 6
 }
 
 function Invoke-DreamSkinCodexWindowActivation {

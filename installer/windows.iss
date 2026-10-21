@@ -14,8 +14,8 @@ AppId={{97EC4AF8-3971-4B65-A78E-16B0D870C41D}
 AppName=Codex 换肤管理中心
 AppVersion={#AppVersion}
 AppPublisher=Codex Dynamic Skin contributors
-AppPublisherURL=https://github.com/JiPaiFan1109/Codex-Dynamic-Skin
-AppSupportURL=https://github.com/JiPaiFan1109/Codex-Dynamic-Skin/issues
+AppPublisherURL=https://github.com/JiPaiFan1109/Codex-SkinDIY
+AppSupportURL=https://github.com/JiPaiFan1109/Codex-SkinDIY/issues
 #ifdef TestInstallRoot
 DefaultDirName={#TestInstallRoot}
 #else
@@ -49,8 +49,9 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; Flags: checkedonce
 
 [Files]
 Source: "{#SourceRoot}\engine\*"; DestDir: "{app}\engine"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SourceRoot}\scripts\*"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#SourceRoot}\appearance\skin-manager.ico"; DestDir: "{app}\appearance"; Flags: ignoreversion
+Source: "{#SourceRoot}\scripts\*"; DestDir: "{app}\scripts"; Excludes: "check-upgrade.ps1"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceRoot}\scripts\check-upgrade.ps1"; Flags: dontcopy
+Source: "{#SourceRoot}\appearance\*"; DestDir: "{app}\appearance"; Flags: ignoreversion
 Source: "{#SourceRoot}\CodexSkinManager.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceRoot}\VERSION"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceRoot}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
@@ -68,10 +69,10 @@ Type: files; Name: "{app}\engine\scripts\verify-dream-skin.ps1"
 
 [Icons]
 #ifndef TestInstallRoot
-Name: "{userprograms}\Codex 换肤管理中心\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"
+Name: "{userprograms}\Codex 换肤管理中心\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"; AppUserModelID: "CodexDynamicSkin.Manager"
 Name: "{userprograms}\Codex 换肤管理中心\打开换肤版 Codex"; Filename: "{app}\engine\launcher\CodexDynamicSkinLauncher.exe"; IconFilename: "{app}\CodexSkinManager.exe"
 Name: "{userprograms}\Codex 换肤管理中心\卸载"; Filename: "{uninstallexe}"
-Name: "{userdesktop}\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"; Tasks: desktopicon
+Name: "{userdesktop}\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"; AppUserModelID: "CodexDynamicSkin.Manager"; Tasks: desktopicon
 #endif
 
 [Run]
@@ -80,6 +81,25 @@ Filename: "{app}\CodexSkinManager.exe"; Description: "打开 Codex 换肤管理�
 #endif
 
 [Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExitCode: Integer;
+  Params: String;
+  BlockReason: AnsiString;
+begin
+  Result := '';
+  ExtractTemporaryFile('check-upgrade.ps1');
+  Params := '-NoProfile -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File "' + ExpandConstant('{tmp}\check-upgrade.ps1') + '" -InstallRoot "' + ExpandConstant('{app}') + '" -ResultPath "' + ExpandConstant('{tmp}\upgrade-check-result.txt') + '"';
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+    Result := '无法完成安装前检查，本次安装未替换文件。请重新运行安装程序。'
+  else if ExitCode <> 0 then begin
+    if LoadStringFromFile(ExpandConstant('{tmp}\upgrade-check-result.txt'), BlockReason) and (Length(BlockReason) > 0) then
+      Result := UTF8Decode(BlockReason)
+    else
+      Result := '无法完成后台检查，本次安装未替换文件。请退出相关程序后重试。';
+  end;
+end;
+
 function InitializeSetup: Boolean;
 var
   ExpectedDirectory: String;
@@ -96,14 +116,18 @@ begin
   end;
 end;
 
-function InitializeUninstall: Boolean;
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ExitCode: Integer;
   Params: String;
 begin
+  if CurUninstallStep <> usUninstall then Exit;
+  { This event runs after uninstall confirmation and before any files are deleted. }
   Params := '-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy RemoteSigned -File "' + ExpandConstant('{app}\scripts\uninstall-app.ps1') + '"';
   if UninstallSilent then Params := Params + ' -Silent';
-  Result := Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
-  if Result then Result := ExitCode = 0;
-  if not Result and not UninstallSilent then MsgBox('外观恢复未完成，卸载已停止。请在换肤管理中心恢复原始外观后重试。壁纸库会保留在安装目录。', mbError, MB_OK);
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params, '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+    RaiseException('无法启动外观恢复，卸载已停止，应用和壁纸库均保留。');
+  if ExitCode = 2 then Abort;
+  if ExitCode <> 0 then
+    RaiseException('外观恢复未完成，卸载已停止。请先在换肤管理中心恢复原始外观后重试。');
 end;

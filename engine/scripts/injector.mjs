@@ -374,9 +374,9 @@ class BrowserIdentityAnchor {
   }
 }
 
-async function fetchCdpJson(port, resource) {
+async function fetchCdpJson(port, resource, timeoutMs = 2000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 2000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`http://127.0.0.1:${port}${resource}`, {
       redirect: "error",
@@ -404,8 +404,19 @@ async function listAppTargets(port, expectedBrowserId = null) {
   return targets.filter((item) => isValidCdpPageTarget(item, port));
 }
 
-async function connectBrowserIdentityAnchor(port, expectedBrowserId) {
-  const version = await fetchCdpJson(port, "/json/version");
+async function connectBrowserIdentityAnchor(port, expectedBrowserId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let version;
+  while (true) {
+    try {
+      version = await fetchCdpJson(port, "/json/version", Math.min(2000, Math.max(1, deadline - Date.now())));
+      break;
+    } catch (error) {
+      if (error.name !== "AbortError" || Date.now() >= deadline) throw error;
+      console.error("[dream-skin] initial CDP identity probe timed out; retrying within the startup deadline");
+      await new Promise(resolve => setTimeout(resolve, Math.min(250, deadline - Date.now())));
+    }
+  }
   const actualBrowserId = browserIdFromVersion(version, port);
   if (actualBrowserId !== expectedBrowserId) {
     throw new CdpIdentityMismatchError(
@@ -510,6 +521,16 @@ export async function loadTheme(themeDir) {
     image,
     appearance: normalizedChoice(raw.appearance, "appearance", THEME_CHOICES.appearance, "auto"),
   };
+  if (raw.imageShade !== undefined) {
+    if (typeof raw.imageShade !== "number" || !Number.isFinite(raw.imageShade) || raw.imageShade < 0 || raw.imageShade > 1) throw new Error("Invalid wallpaper shade");
+    theme.imageShade = raw.imageShade;
+  }
+  if (raw.imageOpacity !== undefined) {
+    if (typeof raw.imageOpacity !== "number" || !Number.isFinite(raw.imageOpacity) || raw.imageOpacity < 0 || raw.imageOpacity > 1) {
+      throw new Error("Invalid wallpaper image opacity");
+    }
+    theme.imageOpacity = raw.imageOpacity;
+  }
   const [themeStat, imageStat, safeCss] = await Promise.all([
     fs.stat(themePath),
     fs.stat(realImagePath),
@@ -856,6 +877,22 @@ export async function applyToSession(session, payload, videoConfig = null) {
   return result;
 }
 
+export async function maintainSession(session, payload, videoConfig = null) {
+  const present = await session.evaluate(`(() => {
+    const state = window.__CODEX_DREAM_SKIN_STATE__;
+    if (typeof state?.ensure !== "function" || window.__CODEX_DREAM_SKIN_DISABLED__) return false;
+    state.ensure({root: true});
+    return true;
+  })()`);
+  if (present) return true;
+  // A reload can finish before the load listener is attached. Never reapply
+  // to an unrelated page or an excluded pet surface on the same target.
+  const probe = await probeSession(session);
+  if (!probe?.codex) return false;
+  await applyToSession(session, payload, videoConfig);
+  return true;
+}
+
 export function earlyPayloadFor(payload, revision) {
   return `(() => {
     const generationKey = "__CODEX_DREAM_SKIN_EARLY_GENERATION__";
@@ -1075,6 +1112,11 @@ async function bestEffortOperationUi(session, action, token, state, message, tim
     console.error(`[dream-skin] client status unavailable: ${error.message}`);
     return false;
   }
+}
+
+export async function presentOperationUi(session, token, state, message, timeoutMs = 10000) {
+  if (await bestEffortOperationUi(session, "update", token, state, message, timeoutMs)) return true;
+  return bestEffortOperationUi(session, "show", token, state, message, timeoutMs);
 }
 
 async function removeFromSession(session) {
@@ -1497,7 +1539,7 @@ async function runOneShot(options) {
 }
 
 async function runWatch(options) {
-  const identityAnchor = await connectBrowserIdentityAnchor(options.port, options.browserId);
+  const identityAnchor = await connectBrowserIdentityAnchor(options.port, options.browserId, options.timeoutMs);
   const sessions = new Map();
   const earlyScripts = new Map();
   const fallbackTargets = new Map();
@@ -1508,6 +1550,7 @@ async function runWatch(options) {
   let lastListErrorLogAt = 0;
   let lastThemeErrorLogAt = 0;
   let lastStrongThemeAuditAt = 0;
+  let lastSessionAuditAt = 0;
   let loadedPayload = null;
   const videoConfig = options.videoState ? await loadVideoReadiness(options.videoState) : null;
   let paused = false;
@@ -1663,6 +1706,23 @@ async function runWatch(options) {
           session.close();
           sessions.delete(id);
           targetFailures.delete(id);
+        }
+      }
+
+      if (!paused && Date.now() - lastSessionAuditAt >= 10000) {
+        lastSessionAuditAt = Date.now();
+        for (const [id, session] of sessions) {
+          try {
+            if (await maintainSession(session, loadedPayload.payload, loadedPayload.video)) continue;
+          } catch (error) {
+            console.error(`[dream-skin] health repair deferred for ${id}: ${error.message}`);
+          }
+          await removeEarlyPayload(session, earlyScripts.get(id));
+          earlyScripts.delete(id);
+          fallbackTargets.delete(id);
+          fallbackListeners.delete(id);
+          session.close();
+          sessions.delete(id);
         }
       }
 

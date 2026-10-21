@@ -1,6 +1,6 @@
 {
   "name": "codex-dynamic-skin",
-  "version": "0.2.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Local static and animated backgrounds for the Windows Codex desktop app",
   "type": "module",
@@ -9,5 +9,7 @@
     "test": "node --test tests/*.test.mjs",
     "test:windows": "powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File scripts/test.ps1"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

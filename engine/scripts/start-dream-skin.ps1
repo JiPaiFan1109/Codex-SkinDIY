@@ -19,6 +19,8 @@ $Injector = Join-Path $PSScriptRoot 'injector.mjs'
 . (Join-Path $PSScriptRoot 'localization-windows.ps1')
 . (Join-Path $PSScriptRoot 'video-windows.ps1')
 . (Join-Path $PSScriptRoot 'fast-resume.ps1')
+. (Join-Path $PSScriptRoot 'existing-session.ps1')
+. (Join-Path $PSScriptRoot 'multi-instance.ps1')
 
 function Invoke-DreamSkinStartupAppearanceRecovery {
   param(
@@ -88,12 +90,12 @@ try {
   $coexistingProfiles = @($openingInstances.Managed).Count -gt 0 -and -not $openingInstances.IsExclusive
   $fastState = $null
   if (-not $PortExplicit -and -not $ProfilePathExplicit -and -not $ForegroundInjector -and
-      -not $RestartExisting -and -not $ResultToken -and -not $coexistingProfiles) {
+      -not $RestartExisting -and -not $coexistingProfiles) {
     $fastState = Get-DreamSkinFastResumeCandidate -StateRoot $StateRoot -Codex $currentCodex
   }
   if ($null -ne $fastState) {
     $fastArguments = @('--remote-debugging-address=127.0.0.1', "--remote-debugging-port=$($fastState.port)", "--user-data-dir=$($fastState.profilePath)")
-    $null = Start-DreamSkinCodex -Codex $currentCodex -Arguments $fastArguments
+    if(-not $ResultToken){$null = Start-DreamSkinCodex -Codex $currentCodex -Arguments $fastArguments}
     Write-Host ('Existing window opened after {0:N2} seconds; checking playback...' -f $startupTimer.Elapsed.TotalSeconds)
   } elseif (-not $PortExplicit -and -not $ProfilePathExplicit -and -not $ForegroundInjector -and
             -not $RestartExisting -and -not $ResultToken -and -not $coexistingProfiles) {
@@ -111,13 +113,21 @@ try {
   if ($null -ne $fastState) {
     $fastIdentity = Get-DreamSkinVerifiedCdpIdentity -Port $fastState.port -Codex $currentCodex
     if ($null -ne $fastIdentity -and $fastIdentity.BrowserId -ceq $fastState.browserId) {
-      $fastVerify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList @(
-        $Injector, '--verify', '--port', "$($fastState.port)", '--browser-id', $fastState.browserId,
-        '--theme-dir', $fastState.themeDir, '--video-state', $fastState.videoReadyPath, '--timeout-ms', '3000'
-      )
-      if ($fastVerify.ExitCode -eq 0) {
+      # Apply requests must install and verify the new revision; a plain open
+      # only checks the existing revision. Keep the live watcher and services.
+      $fastMode=if($ResultToken){'--once'}else{'--verify'}
+      $fastArguments=@($Injector,$fastMode,'--port',"$($fastState.port)",'--browser-id',$fastState.browserId,
+        '--theme-dir',$fastState.themeDir,'--timeout-ms','3000')
+      if($fastState.videoPid){$fastArguments += @('--video-state',$fastState.videoReadyPath)}
+      if($ResultToken){$fastArguments += '--silent-ui'}
+      $fastVerify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList $fastArguments
+      $stillRunning=Get-DreamSkinFastResumeCandidate -StateRoot $StateRoot -Codex $currentCodex
+      if ($fastVerify.ExitCode -eq 0 -and $null -ne $stillRunning -and
+          $stillRunning.browserId -ceq $fastState.browserId) {
         Write-DreamSkinUtf8FileAtomically -Path (Join-Path $StateRoot 'verify.log') -Content (($fastVerify.Output -join "`r`n") + "`r`n")
         Write-Host ('Earth background resumed and verified in {0:N2} seconds. Existing services were preserved.' -f $startupTimer.Elapsed.TotalSeconds)
+        if($ResultToken){Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken -Outcome success -Category none -AppearanceRecovery retained}
+        Start-DreamSkinInstanceMonitor -StateRoot $StateRoot
         exit 0
       }
     }
@@ -168,12 +178,26 @@ try {
   $currentProcesses = Get-DreamSkinCodexProcesses -Codex $currentCodex
   $currentInstances = Get-DreamSkinCodexInstanceStatus `
     -Processes $currentProcesses -Port $Port -ProfilePath $ProfilePath
+  $attachExisting=$false
+  $existingEndpoint=$null
+  if(-not $RestartExisting){
+    $existingEndpoint=Get-DreamSkinExistingEndpoint -Codex $currentCodex -Processes $currentProcesses -PreferredPort $Port -RequirePreferred:$PortExplicit
+    if($null -ne $existingEndpoint){
+      $Port=$existingEndpoint.Port
+      $attachExisting= -not ($currentInstances.IsExclusive -and $currentInstances.Managed.Count -eq 1)
+      Write-Host "Verified existing Codex connection on port $Port; preserving its process and profile."
+    }
+  }
   $closedExistingCodex = $false
-  $coexistenceAction = Resolve-DreamSkinCodexCoexistenceAction `
+  $coexistenceAction = if($attachExisting){'continue'}else{ Resolve-DreamSkinCodexCoexistenceAction `
     -Status $currentInstances -RestartExisting:$RestartExisting -PromptRestart:$PromptRestart `
     -Message (Get-DreamSkinText -Key 'MultipleInstancesPrompt' -Language $language)
+  }
   if ($coexistenceAction -ceq 'cancel') {
     Write-Host (Get-DreamSkinText -Key 'LaunchCancelled' -Language $language)
+    if ($ResultToken) {
+      Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken -Outcome failure -Category cancelled -AppearanceRecovery retained
+    }
     exit 0
   }
   if ($coexistenceAction -ceq 'restart') {
@@ -220,6 +244,7 @@ try {
   }
   $pendingAppearanceTransaction = Test-DreamSkinPendingAppearanceTransaction `
     -BackupPath $BackupPath
+  if ($pendingAppearanceTransaction -and $attachExisting){throw '有待恢复的外观事务，已保留第三方启动的 Codex，请先恢复外观后重试。'}
   if ($pendingAppearanceTransaction) {
     # A previous process ended before it could commit or recover appearance.
     # Do not reuse its live session: the locked restart path closes Codex first,
@@ -227,12 +252,23 @@ try {
     $appearanceRecovery = 'blocked'
     $cdpIdentity = $null
   }
+  # A managed process can exist before its first page exposes CDP. Give that
+  # startup a bounded chance to finish before offering a disruptive restart.
+  if($null -eq $cdpIdentity -and -not $pendingAppearanceTransaction -and
+     @($currentInstances.Managed).Count -gt 0 -and $currentInstances.IsExclusive){
+    $endpointDeadline=[datetime]::UtcNow.AddSeconds(4)
+    do {
+      Start-Sleep -Milliseconds 200
+      $cdpIdentity=Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex
+    } while($null -eq $cdpIdentity -and [datetime]::UtcNow -lt $endpointDeadline)
+  }
   $debugReady = $null -ne $cdpIdentity
   $codexProcesses = if (Test-DreamSkinPathEqual -Left $codexToStop.Executable -Right $currentCodex.Executable) {
     $currentProcesses
   } else {
     Get-DreamSkinCodexProcesses -Codex $codexToStop
   }
+  if($attachExisting -and -not $debugReady){throw '现有 Codex 连接暂时不可用，已保留窗口；请稍后重试。'}
   if (-not $debugReady -and $codexProcesses.Count -gt 0) {
     Write-Host ('Restart check: ' + ([pscustomobject]@{
       time = (Get-Date).ToString('o'); port = $Port; pendingAppearance = $pendingAppearanceTransaction
@@ -245,6 +281,9 @@ try {
         (Get-DreamSkinText -Key 'RestartPrompt' -Language $language)
       if (-not $restartAuthorized) {
         Write-Host (Get-DreamSkinText -Key 'LaunchCancelled' -Language $language)
+        if ($ResultToken) {
+          Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken -Outcome failure -Category cancelled -AppearanceRecovery retained
+        }
         exit 0
       }
     }
@@ -281,6 +320,7 @@ try {
       }
     }
     if ($null -eq (Get-DreamSkinVerifiedCdpIdentity -Port $Port -Codex $codex)) {
+      if($attachExisting){throw '现有 Codex 连接已关闭，已保留窗口；请稍后重试。'}
       # Backgrounds are session-only; never rewrite the user's global theme,
       # fonts, model, account or plugin configuration during startup.
       $startFailureCategory = 'port-unavailable'
@@ -304,7 +344,7 @@ try {
       if ($debugLaunch.Strategy -eq 'direct-store-executable') {
         Write-Warning 'Codex package activation did not preserve the CDP arguments; using the validated Store executable fallback for this session.'
       }
-    } else {
+    } elseif(-not $attachExisting) {
       # Closing the window can leave the verified CDP process alive. Reuse its
       # profile through package activation so the main window is shown again.
       Write-Host 'Opening the existing Earth background window...'
@@ -575,6 +615,7 @@ try {
       codexPackageFamilyName = $codex.PackageFamilyName
       codexVersion = $codex.Version
       browserId = $cdpIdentity.BrowserId
+      attachedExisting = $attachExisting
       profilePath = $ProfilePath
       themeDir = $themePaths.Active
       pauseFile = $themePaths.PauseFile
@@ -602,6 +643,7 @@ try {
       $verifyArguments += $injectorVideoArgs
       $verify = Invoke-DreamSkinNative -FilePath $node.Path -ArgumentList $verifyArguments
       Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
+      if ($daemon.HasExited) { throw "The injector exited during startup. See $StderrPath" }
       if ($verify.ExitCode -eq 0) { break }
       Write-Host ('Verification failed at ' + (Get-Date).ToString('o') + ': ' + ($verify.Output -join "`r`n"))
       # A verify can fail while the theme is demonstrably on screen: the
@@ -628,6 +670,7 @@ try {
         Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (
           (($verify.Output + $once.Output) -join "`r`n") + "`r`n"
         )
+        if ($daemon.HasExited) { throw "The injector exited during startup. See $StderrPath" }
         if (Test-DreamSkinRenderedVerificationOutput -Output $once.Output) {
           $skinLooksRendered = $true
         }
@@ -760,6 +803,7 @@ try {
     throw $startupError
   }
 
+  Start-DreamSkinInstanceMonitor -StateRoot $StateRoot
   Write-Host "Codex Dream Skin is active on verified loopback port $Port."
   if ($ResultToken) {
     Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken `

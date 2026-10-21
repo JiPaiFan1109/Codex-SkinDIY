@@ -1,10 +1,10 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $repo 'scripts/media.ps1');Initialize-DynamicMedia -InstallRoot $repo
 $root=Join-Path ([IO.Path]::GetTempPath()) ('restore-result-'+[guid]::NewGuid().ToString('N'))
 try{
   $scripts=Join-Path $root 'scripts';[IO.Directory]::CreateDirectory($scripts)|Out-Null
-  foreach($name in @('common-windows.ps1','config-utf8.ps1','restore-dream-skin.ps1')){Copy-Item -LiteralPath (Join-Path $repo "engine/scripts/$name") -Destination $scripts}
+  foreach($name in @('common-windows.ps1','config-utf8.ps1','loopback-http.ps1','restore-dream-skin.ps1')){Copy-Item -LiteralPath (Join-Path $repo "engine/scripts/$name") -Destination $scripts}
   # Replace process/installation discovery boundaries; execute the real restore control flow.
   [IO.File]::WriteAllText((Join-Path $scripts 'theme-windows.ps1'),@'
 function Enter-DreamSkinOperationLock {return $null}

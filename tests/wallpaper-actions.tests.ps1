@@ -12,6 +12,22 @@ try {
   $source=Join-Path $root 'source.png';$bitmap=New-Object Drawing.Bitmap 8,8
   try{$bitmap.Save($source,[Drawing.Imaging.ImageFormat]::Png)}finally{$bitmap.Dispose()}
   $image=(Import-DynamicWallpaper $source Image $root).Item
+  Assert ($image.Transparency -eq 0) 'Legacy wallpaper should default to opaque'
+  $image=Set-DynamicWallpaperTransparency $root $image.Id 35
+  Assert ((Get-DynamicWallpaperItem $root $image.Id).Transparency -eq 35) 'Transparency did not persist'
+  Reject {Set-DynamicWallpaperTransparency $root $image.Id 101}
+  Use-DynamicWallpaper $root $image.Id {}|Out-Null
+  $theme=Get-Content (Join-Path $root 'active-theme/theme.json') -Raw|ConvertFrom-Json
+  Assert ([Math]::Abs($theme.imageOpacity-0.64) -lt 0.0001) ('Legacy transparency migration failed: '+$theme.imageOpacity)
+  foreach($level in @(0,50,100)){
+    Set-DynamicWallpaperPreviewLevel $root $image.Id $level|Out-Null
+    Use-DynamicWallpaper $root $image.Id {}|Out-Null
+    $theme=Get-Content (Join-Path $root 'active-theme/theme.json') -Raw|ConvertFrom-Json
+    $expectedOpacity=1-[Math]::Max(0.0,($level-50)/50.0)
+    Assert ($theme.imageOpacity -eq $expectedOpacity) 'Preview level opacity mapping failed'
+    Assert ($theme.imageShade -eq [Math]::Min(1.0,$level/50.0)) 'Preview level shade mapping failed'
+  }
+  Assert ((Get-DynamicWallpaperStatus $root).CurrentId -eq $image.Id) 'Transparency broke current wallpaper matching'
   Use-DynamicWallpaper $root $image.Id {}|Out-Null
   Assert ((Get-DynamicWallpaperStatus $root).CurrentId -eq $image.Id) 'Current image not recognized'
   Reject {Remove-DynamicWallpaper $root $image.Id}

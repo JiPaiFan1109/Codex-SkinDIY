@@ -50,6 +50,36 @@ test('rejects SHA mismatch without attaching media', async t => {
   await assert.rejects(installVideoBlob(f.session, config), /SHA|hash/i);
   assert.equal(f.blobs.length, 0); assert.equal(f.state.videoUpload, undefined);
 });
+
+test('concurrent windows share one verified download and attach independently', async t => {
+  const { bytes, config } = fixture();
+  const calls = mockFetch(t, bytes);
+  const windows = Array.from({ length: 8 }, sessionFixture);
+  await Promise.all(windows.map(f => installVideoBlob(f.session, config)));
+  assert.equal(calls(), 1);
+  for (const f of windows) {
+    assert.equal(f.attached.length, 1);
+    assert.deepEqual(Buffer.from(await f.blobs[0].arrayBuffer()), bytes);
+    assert.equal(f.state.videoUpload, undefined);
+  }
+});
+
+test('failed shared download is cleared so a later attempt can recover', async t => {
+  const { bytes, config } = fixture();
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls++;
+    if (calls === 1) throw Error('temporary network failure');
+    return new Response(bytes);
+  });
+  const windows = [sessionFixture(), sessionFixture()];
+  const results = await Promise.allSettled(windows.map(f => installVideoBlob(f.session, config)));
+  assert.ok(results.every(result => result.status === 'rejected'));
+  assert.equal(calls, 1);
+  await installVideoBlob(windows[0].session, config);
+  assert.equal(calls, 2);
+  assert.equal(windows[0].attached.length, 1);
+});
 test('rejects invalid endpoint and oversized media before fetch', async t => {
   let calls = 0; t.mock.method(globalThis, 'fetch', async () => { calls++; throw Error('unexpected'); });
   const { config } = fixture(); const f = sessionFixture();

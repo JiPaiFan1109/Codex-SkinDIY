@@ -5,6 +5,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import { pipeline } from "node:stream";
 import { fileURLToPath } from "node:url";
 
 function normalizeHash(value) {
@@ -109,7 +110,14 @@ export async function startVideoServer({
   const playerRoute = "/" + token + "/player.html";
   const playerHtml = Buffer.from(playerDocument(), "utf8");
   const server = http.createServer((request, response) => {
-    const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    let requestUrl;
+    try {
+      requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
+    } catch {
+      response.writeHead(400, { "Content-Length": "0" });
+      response.end();
+      return;
+    }
     if (requestUrl.search || (requestUrl.pathname !== route && requestUrl.pathname !== playerRoute)) {
       response.writeHead(404, { "Content-Length": "0" });
       response.end();
@@ -160,7 +168,7 @@ export async function startVideoServer({
       if (request.method === "HEAD") {
         response.end();
       } else {
-        fs.createReadStream(source.filePath, range).pipe(response);
+        pipeline(fs.createReadStream(source.filePath, range), response, () => {});
       }
       return;
     }
@@ -172,7 +180,7 @@ export async function startVideoServer({
     if (request.method === "HEAD") {
       response.end();
     } else {
-      fs.createReadStream(source.filePath).pipe(response);
+      pipeline(fs.createReadStream(source.filePath), response, () => {});
     }
   });
 

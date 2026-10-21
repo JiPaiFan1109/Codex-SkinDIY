@@ -32,6 +32,10 @@ try{
             0 {Assert ($ui.Items.Count -eq 0) 'Fresh UI was not empty';Start-DynamicManagerWork Import (Join-Path $repo 'docs/images/earth-preview.png');$script:qa.Step=1}
             1 {
               Assert ($ui.Items.Count -eq 1 -and $ui.Selected.Kind -eq 'Image') 'Background import did not update cards'
+              Show-DynamicCodexPreview
+              Assert ($ui.Controls.PreviewOverlay.Visibility -eq 'Visible' -and $null -ne $ui.Controls.PreviewImage.Source) 'Codex preview did not open with selected image'
+              Close-DynamicCodexPreview
+              Assert ($ui.Controls.PreviewOverlay.Visibility -eq 'Collapsed') 'Preview did not close'
               $ui.Controls.ImageFilter.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
               Start-DynamicManagerWork Import (Join-Path $repo 'docs/media/earth-demo.mp4');$script:qa.Step=2
             }
@@ -50,7 +54,6 @@ try{
               Stop-DynamicManagerPreview
               Assert ($null -eq $ui.Controls.PreviewVideo.Source -and -not $ui.Playing) 'Preview did not release source'
               $handle=[IO.File]::Open($media,'Open','ReadWrite','None');$handle.Dispose()
-              $ui.Controls.AllFilter.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
               Start-DynamicManagerWork Rename $ui.Selected.Id '我的地球动态壁纸'
               $script:qa.Step=4
             }
@@ -61,7 +64,7 @@ try{
               }
               $ui.Window.UpdateLayout()
               $cardImages=@(Get-VisualImages $ui.Controls.WallpaperList)
-              Assert ($cardImages.Count -eq 2 -and @($cardImages|Where-Object {$null -ne $_.Source}).Count -eq 2) 'Card bitmap binding did not display thumbnails'
+              Assert ($cardImages.Count -eq 1 -and @($cardImages|Where-Object {$null -ne $_.Source}).Count -eq 1) 'Video filter did not display the selected video thumbnail'
               if($script:qa.CapturePath){
                 $ui.Window.UpdateLayout()
                 $dpi=[Windows.Media.VisualTreeHelper]::GetDpi($ui.Window)
@@ -76,7 +79,39 @@ try{
             5 {
               Assert ($ui.Items.Count -eq 1) 'Stopped video could not be deleted'
               Assert (-not (Test-Path (Join-Path $root 'active-theme'))) 'PrepareOnly UI changed background'
-              $script:qa.Timer.Stop();$ui.Window.Close();$script:qa.Step=6
+              $project=Join-Path $root 'renamed collection/project'
+              [IO.Directory]::CreateDirectory($project)|Out-Null
+              Copy-Item (Join-Path $repo 'docs/images/earth-preview.png') (Join-Path $project 'image.png')
+              [IO.File]::WriteAllText((Join-Path $project 'project.json'),'{"type":"image","file":"image.png","title":"Engine fixture"}')
+              Start-DynamicManagerWork EngineImport $project;$script:qa.Step=6
+            }
+            6 {
+              Assert ($ui.Source -eq 'WallpaperEngine' -and $ui.Controls.WallpaperList.Items.Count -eq 1) 'Engine import did not display engine gallery'
+              Assert ($ui.Controls.ConfirmationOverlay.Visibility -eq 'Visible' -and $ui.Controls.ConfirmAcceptButton.Content -eq '知道了') 'Batch import did not show acknowledgement'
+              Complete-DynamicManagerConfirmation $true
+              Assert ($ui.Controls.ConfirmationOverlay.Visibility -eq 'Collapsed') 'Batch report did not close after acknowledgement'
+              Assert ($ui.Controls.EnginePanel.Visibility -eq 'Collapsed' -and $ui.Controls.EngineNavLabel.Visibility -eq 'Visible') 'Engine landing obscures imported wallpapers'
+              $ui.Controls.LocalNavButton.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
+              Assert ($ui.Source -eq 'Local' -and $ui.Controls.WallpaperList.Items.Count -eq 1) 'Local tab lost explicit manual import'
+              $ui.Controls.OpenButton.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
+              Assert ($ui.Busy -and $ui.Controls.ConnectionLoading.Visibility -eq 'Visible') 'Connection icon did not start retry spinner'
+              $script:qa.Step=7
+            }
+            7 {
+              Assert ($ui.Controls.ConnectionLoading.Visibility -eq 'Collapsed') 'Connection retry left spinner running'
+              Start-DynamicManagerWork Import (Join-Path $repo 'engine/assets/demo-background.png');$script:qa.Step=8
+            }
+            8 {
+              $ids=@($ui.Controls.WallpaperList.ItemsSource|ForEach-Object {$_.Id})
+              Assert ($ids.Count -eq 2) 'Two image cards required for swap integration'
+              $script:qa.SwapFirst=$ids[0];$script:qa.SwapSecond=$ids[1]
+              Invoke-DynamicManagerCardSwap $ids[0] $ids[1];$script:qa.Step=9
+            }
+            9 {
+              $ids=@($ui.Controls.WallpaperList.ItemsSource|ForEach-Object {$_.Id})
+              Assert ($ids[0] -eq $script:qa.SwapSecond -and $ids[1] -eq $script:qa.SwapFirst) 'Worker swap did not update gallery'
+              Assert ($ui.Controls.PreviewOverlay.Visibility -eq 'Collapsed') 'Swap opened wallpaper preview'
+              $script:qa.Timer.Stop();$ui.Window.Close();$script:qa.Step=10
             }
           }
         }catch{
@@ -90,8 +125,8 @@ try{
   }
   Show-DynamicSkinManager -InstallRoot $repo -StateRoot $root -PrepareOnly
   if($script:qa.Error){throw $script:qa.Error}
-  Assert ($script:qa.Step -eq 6) 'UI closed before integration finished'
-  'PASS: WPF background import, selection, filtering, real H.264 playback, handle release, rename and delete'
+  Assert ($script:qa.Step -eq 10) 'UI closed before integration finished'
+  'PASS: WPF import, selection, filtering, playback, handle release, rename/delete, source navigation, connection retry and persisted worker swap'
 }finally{
   Set-Item Function:New-DynamicSkinManagerWindow $originalWindow
   if($script:qa.Timer){$script:qa.Timer.Stop()}

@@ -19,7 +19,7 @@ try {
     foreach($obsolete in @('engine/assets/dream-skin.css','engine/assets/theme-package-validator.mjs','engine/scripts/tray-dream-skin.ps1','engine/scripts/apply-community-theme.ps1')){
       if($entries -contains $obsolete){throw "Obsolete upstream asset entered the application: $obsolete"}
     }
-    if ($entries | Where-Object { $_ -ne 'appearance/skin-manager.ico' -and $_ -match '(?i)(^|/)(work|outputs|logs|config|backups)/|\.(ico|lnk)$|earth.*\.(mp4|webm)$' }) { throw 'Private or unlicensed asset entered release.' }
+    if ($entries | Where-Object { $_ -notin @('appearance/skin-manager.ico','appearance/chatgpt-app-light.ico') -and $_ -match '(?i)(^|/)(work|outputs|logs|config|backups)/|\.(ico|lnk)$|earth.*\.(mp4|webm)$' }) { throw 'Private or unlicensed asset entered release.' }
   } finally { $zip.Dispose() }
   $unpacked = Join-Path $temp '中文解压目录'
   Expand-Archive -LiteralPath (Get-ChildItem $temp -Filter '*.zip').FullName -DestinationPath $unpacked

@@ -236,10 +236,15 @@ function makeFixture({
     return node;
   };
   const makeLayerNode = () => {
+    const values = new Map();
     const node = {
       id: "",
       dataset: {},
       parentElement: null,
+      get attributes() { return attributesFor(values); },
+      getAttribute(attribute) { return values.get(attribute) ?? null; },
+      setAttribute(attribute, value) { values.set(attribute, String(value)); },
+      removeAttribute(attribute) { values.delete(attribute); },
       remove() { if (node.id) nodes.delete(node.id); node.parentElement = null; },
     };
     return node;

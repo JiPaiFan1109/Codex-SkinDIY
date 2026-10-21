@@ -11,7 +11,9 @@ function Invoke-DynamicUninstallRestore {
   if(-not $hasSkin){return $true}
   if($Silent){throw '请先在换肤管理中心恢复原始外观，再执行静默卸载。'}
   Initialize-DynamicMedia -InstallRoot $InstallRoot
-  if((Invoke-DynamicEngine -StateRoot $InstallRoot -Restore) -ne $true){throw '已取消恢复，卸载已停止。'}
+  if((Invoke-DynamicEngine -StateRoot $InstallRoot -Restore) -ne $true){throw [OperationCanceledException]::new('已取消恢复，卸载已停止。')}
+  # The engine removes its pause file; retained themes must stay inactive after uninstall.
+  Set-DreamSkinPaused -Paused $true -StateRoot $InstallRoot|Out-Null
   return $true
 }
 
@@ -21,7 +23,10 @@ if($MyInvocation.InvocationName -ne '.'){
     $null=Invoke-DynamicUninstallRestore -InstallRoot (Split-Path $PSScriptRoot -Parent) -Silent:$Silent
     exit 0
   }catch{
-    if(-not $Silent){Add-Type -AssemblyName PresentationFramework;[Windows.MessageBox]::Show($_.Exception.Message,'卸载未完成','OK','Warning')|Out-Null}
+    $cause=$_.Exception
+    while($cause){if($cause -is [OperationCanceledException]){exit 2};$cause=$cause.InnerException}
+    # The installer presents a single error; user cancellation stays silent.
+    Write-Output $_.Exception.Message
     exit 1
   }
 }

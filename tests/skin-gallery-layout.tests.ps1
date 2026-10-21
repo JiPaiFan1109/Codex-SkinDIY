@@ -1,28 +1,19 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot '../scripts/skin-manager.ps1')
 function Assert($Condition,$Message){if(-not $Condition){throw $Message}}
 $window=New-DynamicSkinManagerWindow
 try{
-  $preview=$window.FindName('GalleryPreview')
-  $details=$window.FindName('GalleryDetails')
-  Assert ($null -ne $preview -and $null -ne $details) 'Gallery preview/details layout is missing'
-  $window.FindName('PlayButton').Visibility='Visible'
-  $window.ShowActivated=$false;$window.Show()
-  foreach($size in @(@(1180,860),@(960,720))){
-    $window.Width=$size[0];$window.Height=$size[1];$window.UpdateLayout()
-    $origin=New-Object Windows.Point 0,0
-    $previewPosition=$preview.TranslatePoint($origin,$window.Content)
-    $detailsPosition=$details.TranslatePoint($origin,$window.Content)
-    $listPosition=$window.FindName('WallpaperList').TranslatePoint($origin,$window.Content)
-    Assert ($preview.ActualWidth -gt $details.ActualWidth*1.4) 'Preview does not dominate gallery'
-    Assert ($detailsPosition.X -gt $previewPosition.X+$preview.ActualWidth) 'Details overlap large preview'
-    Assert ($listPosition.Y -ge $previewPosition.Y+$preview.ActualHeight) 'Wallpaper library is not below preview'
-    foreach($name in @('ImportButton','ApplyButton','PlayButton','OpenButton','RestoreButton')){
-      $control=$window.FindName($name);$position=$control.TranslatePoint($origin,$window.Content)
-      Assert ($control.ActualWidth -gt 0 -and $position.X -ge 0 -and $position.X+$control.ActualWidth -le $window.Content.ActualWidth+1) "Action is clipped horizontally: $name"
-      Assert ($position.Y -ge 0 -and $position.Y+$control.ActualHeight -le $window.Content.ActualHeight+1) "Action is clipped vertically: $name"
+  Assert ($null -ne $window.FindName('EngineImportButton')) 'Wallpaper Engine import view missing'
+
+  foreach($size in @(@(1440,900),@(1080,720))){
+    $window.Width=$size[0];$window.Height=$size[1]
+    $window.Content.Measure([Windows.Size]::new($size[0],$size[1]));$window.Content.Arrange([Windows.Rect]::new(0,0,$size[0],$size[1]));$window.Content.UpdateLayout()
+    foreach($name in @('ImportButton','ApplyButton','LocalNavButton','EngineNavButton','WallpaperList')){
+      $control=$window.FindName($name);$bounds=$control.TransformToAncestor($window.Content).TransformBounds([Windows.Rect]::new(0,0,$control.ActualWidth,$control.ActualHeight));$position=$bounds.TopLeft
+      Assert ($control.ActualWidth -gt 0 -and $position.X -ge 0 -and $position.X+$bounds.Width -le $window.Content.ActualWidth+1) "Clipped horizontal action: $name"
+      Assert ($position.Y -ge 0 -and $position.Y+$bounds.Height -le $window.Content.ActualHeight+1) "Clipped vertical action: $name"
     }
+    Assert ($window.FindName('PreviewOverlay').Visibility -eq 'Collapsed') 'Preview obscures library before a click'
   }
-  foreach($name in @('SelectedFormat','SelectedSize','SelectedImportedAt','SelectedStatus')){Assert ($null -ne $window.FindName($name)) "Gallery detail is missing: $name"}
-  'PASS: gallery dominates preview, details align, library stays below, actions fit at 1180x860 and 960x720'
+  'PASS: gallery and navigation fit desktop and compact windows; preview starts closed'
 }finally{$window.Close()}

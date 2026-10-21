@@ -1,4 +1,4 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'engine/scripts/launch-dream-skin.ps1')
 
@@ -15,7 +15,7 @@ try{
     injectorPid=11;injectorStartedAt=$started.ToUniversalTime().ToString('o')
   }
   $state|ConvertTo-Json|Set-Content -LiteralPath (Join-Path $fixture 'state.json') -Encoding UTF8
-  function Invoke-RestMethod { [pscustomobject]@{webSocketDebuggerUrl='ws://127.0.0.1:9345/devtools/browser/browser-123'} }
+  function Invoke-DreamSkinLoopbackJson { [pscustomobject]@{webSocketDebuggerUrl='ws://127.0.0.1:9345/devtools/browser/browser-123'} }
   function Get-Process { [pscustomobject]@{Id=11;Path=$state.nodePath;StartTime=$started} }
   function Get-CimInstance {
     @(

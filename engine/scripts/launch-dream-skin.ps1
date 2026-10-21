@@ -1,6 +1,7 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'loopback-http.ps1')
 
 function Test-DynamicPathEqual {
   param([string]$Left,[string]$Right)
@@ -17,6 +18,7 @@ function Test-DynamicTimestampEqual {
 
 function Test-DynamicQuickState {
   param([object]$State,[string]$StateRoot,[object[]]$Processes,[string]$BrowserId)
+  if($State -and $State.attachedExisting){return $false}
   if($null-eq$State -or "$($State.schemaVersion)"-ne'3' -or "$($State.platform)"-ine'windows'){return $false}
   if("$($State.browserId)"-cne$BrowserId -or $BrowserId-cnotmatch '^[A-Za-z0-9._-]{1,200}$'){return $false}
   if("$($State.codexPackageFamilyName)"-cnotmatch '^OpenAI\.Codex_[A-Za-z0-9]+$'){return $false}
@@ -101,7 +103,7 @@ function Invoke-DynamicQuickLauncher {
     $state=[IO.File]::ReadAllText($statePath)|ConvertFrom-Json -ErrorAction Stop
     $port=[int]$state.port
     if($port-lt1024 -or $port-gt65535){throw 'Invalid port'}
-    $version=Invoke-RestMethod -Uri "http://127.0.0.1:$port/json/version" -TimeoutSec 1 -MaximumRedirection 0 -ErrorAction Stop
+    $version=Invoke-DreamSkinLoopbackJson -Port $port -Resource '/json/version' -TimeoutMilliseconds 1000
     $uri=[Uri]"$($version.webSocketDebuggerUrl)"
     $match=[regex]::Match($uri.AbsolutePath,'^/devtools/browser/(?<id>[A-Za-z0-9._-]{1,200})$')
     if($uri.Scheme-ne'ws' -or $uri.Host-ne'127.0.0.1' -or $uri.Port-ne$port -or -not$match.Success){throw 'Endpoint identity mismatch'}
@@ -117,6 +119,11 @@ function Invoke-DynamicQuickLauncher {
     $aumid="$($state.codexPackageFamilyName)!App"
     $args="--remote-debugging-address=127.0.0.1 --remote-debugging-port=$port --user-data-dir=`"$($state.profilePath)`""
     if([CodexDynamicSkin.QuickPackageLauncher]::Launch($aumid,$args)-le0){throw 'Window activation failed'}
+    $monitor=Join-Path $ScriptRoot 'multi-instance.ps1'
+    if(Test-Path -LiteralPath $monitor){
+      $monitorArgs='-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$monitor+'" -StateRoot "'+$stateRoot+'"'
+      Start-Process (Join-Path $PSHOME 'powershell.exe') -ArgumentList $monitorArgs -WindowStyle Hidden|Out-Null
+    }
     return $true
   }catch{
     try {

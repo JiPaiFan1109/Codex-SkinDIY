@@ -161,12 +161,12 @@ function Stop-DreamSkinRecordedVideo {
   $processId = [int]$State.videoPid
   $handle = Get-Process -Id $processId -ErrorAction SilentlyContinue
   if (-not $handle) {
-    Remove-Item -LiteralPath "$($State.videoReadyPath)" -Force -ErrorAction SilentlyContinue
+    if ($State.videoReadyPath) { Remove-Item -LiteralPath "$($State.videoReadyPath)" -Force -ErrorAction SilentlyContinue }
     return $true
   }
   $startedAt = $handle.StartTime.ToUniversalTime().ToString('o')
   if ($State.videoStartedAt -and $startedAt -cne "$($State.videoStartedAt)") {
-    Remove-Item -LiteralPath "$($State.videoReadyPath)" -Force -ErrorAction SilentlyContinue
+    if ($State.videoReadyPath) { Remove-Item -LiteralPath "$($State.videoReadyPath)" -Force -ErrorAction SilentlyContinue }
     return $false
   }
   $process = Get-CimInstance Win32_Process -Filter "ProcessId = $processId" -ErrorAction SilentlyContinue
@@ -201,6 +201,6 @@ function Stop-DreamSkinRecordedVideo {
   Stop-Process -InputObject $handle -Force -ErrorAction Stop
   [void]$handle.WaitForExit(15000)
   if (-not $handle.HasExited) { throw "The recorded video process did not stop: PID $processId" }
-  Remove-Item -LiteralPath "$($State.videoReadyPath)" -Force -ErrorAction SilentlyContinue
+  if ($State.videoReadyPath) { Remove-Item -LiteralPath "$($State.videoReadyPath)" -Force -ErrorAction SilentlyContinue }
   return $true
 }

@@ -32,3 +32,34 @@ test('shipped default background builds a valid payload without personal paths',
   assert.equal(payload.video,null);
   assert.doesNotMatch(payload.payload,/[A-Z]:[\\/]+Users[\\/]+|arina-hashimoto|桥本有菜/i);
 });
+
+test('static transparency reaches the image layer without fading the interface',()=>{
+  for(const opacity of [0,0.35,1]){
+    const f=makeFixture();vm.runInNewContext(f.payloadFor({imageOpacity:opacity}),f.context);
+    assert.equal(f.document.getElementById('codex-dream-skin-image').getAttribute('style'),'opacity: '+String(opacity)+';');
+    assert.equal(f.rootStyle.getPropertyValue('opacity'),'');
+  }
+});
+
+test('theme loader preserves valid opacity and rejects invalid input',async()=>{
+  const {tmpdir}=await import('node:os');const path=await import('node:path');
+  const dir=await fs.mkdtemp(path.join(tmpdir(),'skin-opacity-'));
+  try{
+    await fs.copyFile(new URL('../engine/assets/demo-background.png',import.meta.url),path.join(dir,'image.png'));
+    for(const value of [0,0.65,1]){
+      await fs.writeFile(path.join(dir,'theme.json'),JSON.stringify({schemaVersion:1,id:'test',image:'image.png',imageOpacity:value}));
+      assert.equal((await loadPayload(dir)).theme.imageOpacity,value);
+    }
+    for(const value of [-1,2,'0.5']){
+      await fs.writeFile(path.join(dir,'theme.json'),JSON.stringify({schemaVersion:1,id:'test',image:'image.png',imageOpacity:value}));
+      await assert.rejects(loadPayload(dir),/opacity/);
+    }
+  }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+test('background strength only adjusts the wallpaper shade layer',()=>{
+  for(const shade of [0,0.5,1]){
+    const f=makeFixture();vm.runInNewContext(f.payloadFor({imageShade:shade,imageOpacity:1}),f.context);
+    assert.equal(f.document.getElementById('codex-dream-skin-video-overlay').getAttribute('style'),'opacity: '+shade+';');
+    assert.equal(f.rootStyle.getPropertyValue('opacity'),'');
+  }
+});

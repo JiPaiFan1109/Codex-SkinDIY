@@ -1,8 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { restoreVideoCache, persistVideoCache } from './video-cache.mjs';
 
 const MAX_BYTES = 128 * 1024 * 1024;
 const CHUNK_BYTES = 512 * 1024;
 let cached = null;
+const pendingReads = new Map();
 
 function validate(config) {
   if (!config || typeof config.url !== 'string') throw Error('Video URL is required');
@@ -24,6 +26,17 @@ function validate(config) {
 
 async function readVerified(config, key) {
   if (cached?.key === key) return cached.bytes;
+  if (pendingReads.has(key)) return pendingReads.get(key);
+  const pending = downloadVerified(config, key);
+  pendingReads.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    pendingReads.delete(key);
+  }
+}
+
+async function downloadVerified(config, key) {
   const response = await fetch(config.url, { redirect: 'error', signal: AbortSignal.timeout(30000) });
   if (!response.ok || !response.body) throw Error(`Video download failed: HTTP ${response.status}`);
   const reader = response.body.getReader();
@@ -61,6 +74,8 @@ export async function installVideoBlob(session, videoConfig) {
     return { token: s.installToken, present: s.videoBlobKey === ${JSON.stringify(key)} && Boolean(s.videoBlobUrl) };
   })()`);
   if (initial.present) return;
+  const cacheConfig = { fileSize: videoConfig.fileSize, fileSha256: videoConfig.fileSha256 };
+  if (await session.evaluate(`(${restoreVideoCache.toString()})(${JSON.stringify(cacheConfig)}, ${JSON.stringify(key)}, ${JSON.stringify(initial.token)})`)) return;
   const bytes = await readVerified(videoConfig, key);
   const generation = randomUUID();
   const tokenLiteral = JSON.stringify(initial.token);
@@ -94,7 +109,8 @@ export async function installVideoBlob(session, videoConfig) {
       if (!(${uploadCheck}) || s.videoUpload.size !== ${bytes.length}) return false;
       const previousUrl = s.videoBlobUrl;
       const previousKey = s.videoBlobKey;
-      const url = URL.createObjectURL(new Blob(s.videoUpload.chunks, { type: 'video/mp4' }));
+      const blob = new Blob(s.videoUpload.chunks, { type: 'video/mp4' });
+      const url = URL.createObjectURL(blob);
       s.videoUpload.chunks = [];
       s.videoBlobUrl = url;
       s.videoBlobKey = ${JSON.stringify(key)};
@@ -105,6 +121,7 @@ export async function installVideoBlob(session, videoConfig) {
         }
         delete s.videoUpload;
         if (previousUrl && previousUrl !== url) URL.revokeObjectURL(previousUrl);
+        void (${persistVideoCache.toString()})(blob, ${JSON.stringify(cacheConfig)});
         return true;
       } catch (error) {
         URL.revokeObjectURL(url);
