@@ -67,7 +67,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          $viewOutput = @(& gh release view "$env:RELEASE_TAG" --json isDraft --jq '.isDraft' 2>&1)
+          $viewErrorPath = Join-Path $env:RUNNER_TEMP 'release-view-error.txt'
+          $viewOutput = @(gh release view "$env:RELEASE_TAG" --json isDraft --jq '.isDraft' 2> $viewErrorPath)
           $viewExitCode = $LASTEXITCODE
           if ($viewExitCode -ne 0) {
             gh release create "$env:RELEASE_TAG" --verify-tag --draft --title "Codex 换肤管理中心 $env:RELEASE_TAG" --notes-file (Join-Path 'docs/releases' ($env:RELEASE_TAG+'.md'))
