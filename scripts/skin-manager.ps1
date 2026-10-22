@@ -218,6 +218,11 @@ namespace DynamicSkin {
   return $window
 }
 
+function Register-DynamicManagerClosingGuard {
+  param([Windows.Window]$Window)
+  $Window.Add_Closing({param($sender,$eventArgs);if($script:SkinManager.Busy -and -not $script:SkinManager.UpdateClosing){$eventArgs.Cancel=$true;$script:SkinManager.Controls.StatusText.Text='任务仍在进行，请等待完成后再关闭窗口。'}})
+}
+
 function Format-DynamicWallpaperSize {
   param([long]$Bytes)
   if($Bytes -ge 1GB){return ('{0:N1} GB' -f ($Bytes/1GB))}
@@ -546,7 +551,7 @@ function Show-DynamicSkinManager {
   foreach($name in @('EngineRefreshButton','EngineSearchSpinner','EngineSearchRotation','EngineSearchStatus','PreviewShade','OpacityPanel','WallpaperOpacitySlider','OpacityValue','GalleryPager','PageLabel','PreviousPageButton','NextPageButton','ImportButton','ImageFilter','VideoFilter','WallpaperList','EmptyState','EmptyTitle','PreviewPlaceholder','PreviewImage','PreviewVideo','SelectedName','SelectedDetails','SelectedFormat','SelectedSize','SelectedImportedAt','SelectedStatus','PreviewNotice','ApplyButton','RenameButton','DeleteButton','WorkProgress','StatusText','OpenButton','RestoreButton')){$controls[$name]=$window.FindName($name)}
   foreach($name in @('LocalNavButton','EngineNavButton','EngineImportButton','EngineFolderButton','EnginePanel','SettingsButton','SettingsPanel','PreviewOverlay','ClosePreviewButton','EngineToolbar','LocalNavLabel','EngineNavLabel','LocalNavIcon','EngineNavIcon','NavThumbTransform','FilterThumb','FilterThumbTransform','ConnectionBadge','ConnectionBadgeText','ConnectionLoading','ConnectionSpinner')){$controls[$name]=$window.FindName($name)}
   foreach($name in @('ConnectionLabel','ConnectionDetail','ConfirmationOverlay','ConfirmationTitle','ConfirmationMessage','ConfirmationScroll','ConfirmationCancelColumn','ConfirmationGapColumn','ConfirmAcceptButton','ConfirmCancelButton','ConfirmCloseButton','ToastPanel','ToastIcon','ToastIconBorder','ToastMessage')){$controls[$name]=$window.FindName($name)}
-  $script:SkinManager=@{Window=$window;Controls=$controls;InstallRoot=$InstallRoot;StateRoot=$StateRoot;ModuleRoot=$PSScriptRoot;PrepareOnly=[bool]$PrepareOnly;Items=@();Status=[pscustomobject]@{CurrentId=$null;Paused=$false;HasExternalCurrent=$false;Error=$null};Selected=$null;Source='Local';Filter='All';Busy=$false;Playing=$false;PromptShown=$false;Worker=$null;Runspace=$null;Async=$null}
+  $script:SkinManager=@{Window=$window;Controls=$controls;InstallRoot=$InstallRoot;StateRoot=$StateRoot;ModuleRoot=$PSScriptRoot;PrepareOnly=[bool]$PrepareOnly;Items=@();Status=[pscustomobject]@{CurrentId=$null;Paused=$false;HasExternalCurrent=$false;Error=$null};Selected=$null;Source='Local';Filter='All';Busy=$false;UpdateClosing=$false;Playing=$false;PromptShown=$false;Worker=$null;Runspace=$null;Async=$null}
   $timer=New-Object Windows.Threading.DispatcherTimer;$timer.Interval=[timespan]::FromMilliseconds(120);$timer.Add_Tick({Complete-DynamicManagerWork});$script:SkinManager.Timer=$timer
   $script:SkinManager.Connection=[pscustomobject]@{Available=$false}
   . (Join-Path $PSScriptRoot 'update-ui.ps1')
@@ -611,7 +616,7 @@ function Show-DynamicSkinManager {
   $controls.RestoreButton.Add_Click({Start-DynamicManagerWork Restore})
   $controls.PreviewVideo.Add_MediaEnded({$video=$script:SkinManager.Controls.PreviewVideo;$video.Position=[timespan]::Zero;$video.Play()})
   $controls.PreviewVideo.Add_MediaFailed({Stop-DynamicManagerPreview;$script:SkinManager.Controls.PreviewNotice.Text='本机无法播放此预览。文件仍保留，可尝试应用壁纸。'})
-  $window.Add_Closing({param($sender,$eventArgs);if($script:SkinManager.Busy){$eventArgs.Cancel=$true;$script:SkinManager.Controls.StatusText.Text='任务仍在进行，请等待完成后再关闭窗口。'}})
+  Register-DynamicManagerClosingGuard $window
   $window.Add_ContentRendered({if(-not $script:SkinManager.Async){Start-DynamicManagerWork Refresh}})
   try {Update-DynamicManagerButtons;$null=$window.ShowDialog()}
   finally {

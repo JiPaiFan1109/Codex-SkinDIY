@@ -86,6 +86,7 @@ function Complete-DynamicUpdateWork {
       Set-DynamicUpdateProgress '正在启动安装程序…'
       $helper=Join-Path $stage 'finish-update.ps1'
       $ready=Join-Path $stage 'ui-ready'
+      if(Test-Path -LiteralPath $ready){Remove-Item -LiteralPath $ready -Force}
       $arguments=@('-NoProfile','-STA','-WindowStyle','Hidden','-ExecutionPolicy','RemoteSigned','-File',('"'+$helper+'"'),'-InstallRoot',('"'+$ui.InstallRoot+'"'),'-Version',$ui.AvailableUpdate.version,'-ManagerProcessId',$PID,'-ReadyPath',('"'+$ready+'"'))
       $helperProcess=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe') -ArgumentList $arguments -WindowStyle Hidden -PassThru
       try{
@@ -95,9 +96,18 @@ function Complete-DynamicUpdateWork {
           $ui.Window.Dispatcher.Invoke([action]{},[Windows.Threading.DispatcherPriority]::Background)
           Start-Sleep -Milliseconds 50
         }
+        if($helperProcess.HasExited){throw '安装窗口已退出，管理中心已保留，请重试。'}
+      }catch{
+        # Before handoff this process can only be waiting for this manager.
+        # Stop our own helper so a late startup cannot race a subsequent retry.
+        if(-not $helperProcess.HasExited){$helperProcess.Kill()}
+        throw
       }finally{$helperProcess.Dispose()}
+      # The manager's normal close guard blocks while Busy. The helper now owns
+      # the upgrade, so allow this one intentional close to release the mutex.
+      $ui.UpdateClosing=$true
       $ui.Window.Close()
-    }catch{$ui.Busy=$false;$ui.Controls.UpdateProgress.Visibility='Collapsed';$ui.Controls.UpdateText.Text='无法启动升级，请重试：'+$_.Exception.Message;Update-DynamicManagerButtons}
+    }catch{$ui.UpdateClosing=$false;$ui.Busy=$false;$ui.Controls.UpdateProgress.Visibility='Collapsed';$ui.Controls.UpdateText.Text='无法启动升级，请重试：'+$_.Exception.Message;Update-DynamicManagerButtons}
   }
 }
 

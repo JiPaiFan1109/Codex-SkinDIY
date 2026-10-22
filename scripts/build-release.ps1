@@ -37,7 +37,7 @@ try {
     'engine/assets/demo-background.png','engine/assets/theme.json',
     'engine/assets/selectors.json','engine/assets/safe-css-validator.mjs','engine/assets/safe-css-policy.json',
     'engine/assets/renderer-inject.js','engine/assets/earth-background.css',
-    'engine/scripts/video-windows.ps1','engine/scripts/video-server.mjs','engine/scripts/video-blob.mjs',
+    'engine/scripts/video-windows.ps1','engine/scripts/video-server.mjs','engine/scripts/video-blob.mjs','engine/scripts/video-cache.mjs',
     'engine/scripts/launch-dream-skin.ps1','engine/scripts/loopback-http.ps1',
     'engine/scripts/existing-session.ps1','engine/scripts/multi-instance.ps1',
     'engine/scripts/quick-launcher.cs',
