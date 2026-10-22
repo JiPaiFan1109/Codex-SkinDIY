@@ -44,6 +44,7 @@
 
 | 日期（北京时间） | 版本 | 更新内容 |
 | --- | --- | --- |
+| 2026-10-22 | [1.2.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.0) | 修复微软商店版 Codex 连接状态误报，支持重新建立连接和手动定位 Codex，改善连接失败诊断 |
 | 2026-10-20 | [1.1.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.1) | 修复更新安装失败、下载校验失败，改善受限网络下的更新检查 |
 | 2026-10-20 | [1.1.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.0) | 更新更方便、壁纸更稳定、多窗口支持、清晰度修复与壁纸目录刷新 |
 | 2026-10-19 | [1.0.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.0.0) | 新版管理中心、Wallpaper Engine 批量导入、快速去重、预览、拖拽排序与签名更新 |
