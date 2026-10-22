@@ -16,6 +16,16 @@ function Show-DynamicUpdateNotice {
   if(-not $ui.AvailableUpdate){return}
   $ui.Controls.UpdateText.Text='新版本 '+$ui.AvailableUpdate.version+'    当前版本：'+$ui.AppVersion
   $ui.Controls.UpdateNotes.Text=$ui.AvailableUpdate.notes
+  $notes=[string]$ui.AvailableUpdate.notes
+  if($notes.StartsWith('【升级方式】')){
+    $lines=$notes -split "`n",2
+    $warning=[Windows.Documents.Run]::new($lines[0])
+    $warning.Foreground=[Windows.Media.BrushConverter]::new().ConvertFromString('#B42318')
+    $warning.FontWeight=[Windows.FontWeights]::SemiBold
+    $ui.Controls.UpdateNotes.Inlines.Clear()
+    $ui.Controls.UpdateNotes.Inlines.Add($warning)
+    if($lines.Count -gt 1){$ui.Controls.UpdateNotes.Inlines.Add([Windows.Documents.Run]::new("`n"+$lines[1]))}
+  }
   $ui.Controls.UpdateBanner.Visibility='Visible'
   $panel=$ui.Window.FindName('SettingsPanel')
   if($panel){$panel.Visibility='Visible'}
