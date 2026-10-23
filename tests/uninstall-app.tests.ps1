@@ -41,6 +41,10 @@ try{
   Assert (Test-Path (Join-Path $root 'paused')) 'Successful uninstall restore must persist inactive state for retained themes'
   function Invoke-DynamicEngine { throw 'Already restored appearance must not run the engine again' }
   Assert (Invoke-DynamicUninstallRestore -InstallRoot $root -Silent) 'Restored appearance with retained theme files should allow silent uninstall'
+  Set-Content (Join-Path $root 'recovery-intent.json') '{}'
+  $rejected=$false
+  try{Invoke-DynamicUninstallRestore -InstallRoot $root -Silent}catch{$rejected=$true}
+  Assert $rejected 'Recovery intent must block silent uninstall even when paused without state'
 }finally{
   $resolved=[IO.Path]::GetFullPath($root)
   $expectedPrefix=Join-Path ([IO.Path]::GetFullPath([IO.Path]::GetTempPath())) 'skin-uninstall-'

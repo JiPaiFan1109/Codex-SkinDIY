@@ -42,6 +42,58 @@ function Get-DynamicWallpaperEngineProjects {
     Get-DynamicWallpaperEngineProjects $child.FullName ($Depth+1) $OnError
   }
 }
+function Import-DynamicSteamReference {
+  param([string]$Media,[string]$Kind,[string]$StateRoot,[string]$Title)
+  Assert-DreamSkinNoReparseComponents -Path $Media
+  $file=Get-Item -LiteralPath $Media -ErrorAction Stop
+  if($Kind -eq 'Image'){Assert-DreamSkinImageFile -Path $Media}
+  elseif(-not (Test-DynamicVideoDirectImport $Media)){throw '此视频需要转码，无法直接引用；可通过本地导入保存兼容副本。'}
+  $hash=(Get-FileHash -LiteralPath $Media -Algorithm SHA256).Hash.ToLowerInvariant()
+  Invoke-DynamicWallpaperLock $StateRoot {
+    $paths=Get-DynamicWallpaperPaths $StateRoot
+    $id=$null;$oldMedia=$null;$oldEntry=$null;$localRecords=@()
+    foreach($directory in Get-ChildItem -LiteralPath $paths.Items -Directory){
+      if($directory.Name -cnotmatch '^[0-9a-f]{32}$'){continue}
+      $item=Read-DynamicWallpaperItem $directory.FullName $directory.Name
+      if($item.External -and $item.MediaPath -ieq $file.FullName){
+        $id=$item.Id;$oldEntry=[IO.File]::ReadAllText((Join-Path $directory.FullName 'item.json'))|ConvertFrom-Json
+        if($item.IsAvailable -and $item.Sha256 -eq $hash){return [pscustomobject]@{Item=$item;AlreadyExists=$true}}
+        break
+      }
+      if($item.IsAvailable -and -not $item.External -and $item.Kind -eq $Kind -and $item.Sha256 -eq $hash -and $item.Sources -contains 'WallpaperEngine'){
+        if($item.Sources -contains 'Local'){$localRecords+=Join-Path $directory.FullName 'item.json';continue}
+        # Do not delete a legacy copy while a live background/server may use it.
+        if((Get-DynamicWallpaperStatus $StateRoot).CurrentId -eq $item.Id){return [pscustomobject]@{Item=$item;AlreadyExists=$true}}
+        $id=$item.Id;$oldMedia=$item.MediaPath
+        $oldEntry=[IO.File]::ReadAllText((Join-Path $directory.FullName 'item.json'))|ConvertFrom-Json
+        break
+      }
+    }
+    $existed=[bool]$id
+    if(-not $id){$id=[guid]::NewGuid().ToString('N')}
+    $directory=Get-DynamicWallpaperDirectory $StateRoot $id
+    Ensure-DreamSkinManagedDirectory -Path $directory -Root $StateRoot
+    $name=$Title;if($name.Length -gt 120){$name=$name.Substring(0,120)}
+    if($oldEntry){$name=$oldEntry.name}
+    $name=Assert-DynamicWallpaperName $name
+    $extension=$file.Extension.ToLowerInvariant()
+    $entry=[ordered]@{schema='codex-dynamic-skin-wallpaper/1';id=$id;name=$name;kind=$Kind;mediaFile=('wallpaper'+$extension);thumbnailFile='thumbnail.png';size=$file.Length;sha256=$hash;importedAtUtc=[datetime]::UtcNow.ToString('o');sources=@('WallpaperEngine');storage='SteamReference';sourcePath=$file.FullName}
+    if($oldEntry){
+      $entry.importedAtUtc=$oldEntry.importedAtUtc
+      foreach($key in @('previewLevel','transparency')){if($oldEntry.PSObject.Properties[$key]){$entry[$key]=$oldEntry.$key}}
+    }
+    $null=New-DynamicWallpaperThumbnail $Media $Kind (Join-Path $directory 'thumbnail.png')
+    Write-DreamSkinUtf8FileAtomically -Path (Join-Path $directory 'item.json') -Content ($entry|ConvertTo-Json)
+    foreach($record in $localRecords){
+      $localEntry=[IO.File]::ReadAllText($record)|ConvertFrom-Json
+      $localEntry.sources=@('Local')
+      Write-DreamSkinUtf8FileAtomically -Path $record -Content ($localEntry|ConvertTo-Json)
+    }
+    if($oldMedia){Assert-DreamSkinNoReparseComponents -Path $oldMedia;Remove-Item -LiteralPath $oldMedia -Force}
+    [pscustomobject]@{Item=(Get-DynamicWallpaperItem $StateRoot $id);AlreadyExists=$existed}
+  }
+}
+
 function Import-DynamicWallpaperEngine {
   param([string[]]$Roots,[string]$StateRoot,[scriptblock]$Report)
   if(-not $Roots){$Roots=@(Get-DynamicWallpaperEngineRoots)}
@@ -70,7 +122,7 @@ function Import-DynamicWallpaperEngine {
         if(-not (Test-Path -LiteralPath $media -PathType Leaf)){throw '项目媒体文件不存在。'}
         $kind='Image';if($project.type -eq 'video'){$kind='Video'}
         if($Report){& $Report ('正在导入：'+$label)}
-        $import=Import-DynamicWallpaper -SourcePath $media -Kind $kind -StateRoot $StateRoot -Report $Report -Source WallpaperEngine
+        $import=Import-DynamicSteamReference -Media $media -Kind $kind -StateRoot $StateRoot -Title $label
         $result.SelectedId=$import.Item.Id
         if($import.AlreadyExists){$result.Existing++}else{
           $result.Imported++

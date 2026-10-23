@@ -10,8 +10,7 @@ $ErrorActionPreference = 'Stop'
 if (-not $StateRoot) { $StateRoot = $InstallRoot }
 $InstallRoot = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
 $StateRoot = [IO.Path]::GetFullPath($StateRoot).TrimEnd('\')
-$defaultRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin')).TrimEnd('\')
-if (-not $PrepareOnly -and ($InstallRoot -ine $defaultRoot -or $StateRoot -ine $defaultRoot)) { throw '自定义目录仅支持 -PrepareOnly，不能修改或启动真实 Codex。' }
+if (-not $PrepareOnly -and ($InstallRoot -ine [IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent)).TrimEnd('\') -or $StateRoot -ine $InstallRoot)) { throw '真实操作必须使用当前安装目录及其状态目录。' }
 . (Join-Path $PSScriptRoot 'media.ps1')
 Initialize-DynamicMedia -InstallRoot $InstallRoot
 

@@ -152,7 +152,7 @@ function Assert-DreamSkinSafeCssFile {
 }
 
 function Get-DreamSkinThemePaths {
-  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'))
+  param([string]$StateRoot = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent))
   $fullRoot = [System.IO.Path]::GetFullPath($StateRoot)
   return [pscustomobject]@{
     Root = $fullRoot
@@ -195,6 +195,21 @@ function Test-DreamSkinThemePathWithin {
   }
 }
 
+function Test-DreamSkinExternalSourceMissing {
+  param([string]$StateRoot)
+  $metadata=Join-Path $StateRoot 'active-theme/theme.json'
+  if(-not (Test-Path -LiteralPath $metadata -PathType Leaf)){return $false}
+  try{
+    Assert-DreamSkinNoReparseComponents -Path $metadata
+    $theme=Read-DreamSkinUtf8File -Path $metadata|ConvertFrom-Json
+    if(-not $theme.externalSource){return $false}
+    $source=$theme.externalSource
+    if(-not [IO.Path]::IsPathRooted([string]$source.path)){return $true}
+    Assert-DreamSkinNoReparseComponents -Path $source.path
+    return (-not (Test-Path -LiteralPath $source.path -PathType Leaf) -or (Get-Item -LiteralPath $source.path).Length -ne [long]$source.size)
+  }catch{return $true}
+}
+
 function Read-DreamSkinTheme {
   param(
     [Parameter(Mandatory = $true)][string]$ThemeDirectory,
@@ -218,7 +233,15 @@ function Read-DreamSkinTheme {
   $image = "$($theme.image)"
   if ([System.IO.Path]::IsPathRooted($image)) { throw 'Theme image path must be relative.' }
   $imagePath = [System.IO.Path]::GetFullPath((Join-Path $directory $image))
-  if (-not (Test-DreamSkinThemePathWithin -Path $imagePath -Root $directory) -or
+  $external=$theme.externalSource -and $theme.externalSource.kind -eq 'Image'
+  if($external){
+    if($image -cne 'external-image' -or -not [IO.Path]::IsPathRooted([string]$theme.externalSource.path)){throw 'Invalid external image reference.'}
+    $imagePath=[IO.Path]::GetFullPath([string]$theme.externalSource.path)
+    Assert-DreamSkinNoReparseComponents -Path $imagePath
+    if((Get-Item -LiteralPath $imagePath).Length -ne [long]$theme.externalSource.size -or
+      (Get-FileHash -LiteralPath $imagePath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $theme.externalSource.sha256){throw 'External image changed.'}
+  }
+  if ((-not $external -and -not (Test-DreamSkinThemePathWithin -Path $imagePath -Root $directory)) -or
     -not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
     throw 'Theme image must remain inside its theme directory and exist.'
   }
@@ -267,7 +290,7 @@ function Write-DreamSkinTheme {
 function Initialize-DreamSkinThemeStore {
   param(
     [Parameter(Mandatory = $true)][string]$SkillRoot,
-    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin')
+    [string]$StateRoot = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent)
   )
   $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   foreach ($directory in @($paths.Root, $paths.Active)) {
@@ -335,7 +358,8 @@ function Set-DreamSkinActiveTheme {
     [AllowNull()][object]$Theme,
     [string]$Name,
     [AllowNull()][string]$SafeCssPath,
-    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin')
+    [switch]$ReferenceImage,
+    [string]$StateRoot = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent)
   )
   $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $paths.Root -Root $paths.Root
@@ -369,6 +393,7 @@ function Set-DreamSkinActiveTheme {
     }
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinNoReparseComponents -Path $temporary
+    if(-not $ReferenceImage){
     Copy-Item -LiteralPath $source -Destination $temporary -Force
     Assert-DreamSkinNoReparseComponents -Path $temporary
     Assert-DreamSkinImageFile -Path $temporary
@@ -376,6 +401,10 @@ function Set-DreamSkinActiveTheme {
     Assert-DreamSkinNoReparseComponents -Path $target
     Assert-DreamSkinImageFile -Path $target
     $Theme | Add-Member -NotePropertyName image -NotePropertyValue $imageName -Force
+    }else{
+      if(-not $Theme.externalSource -or $Theme.externalSource.kind -ne 'Image' -or $Theme.externalSource.path -ine $source){throw 'External image identity is required.'}
+      $Theme | Add-Member -NotePropertyName image -NotePropertyValue 'external-image' -Force
+    }
     if ($Name) { $Theme | Add-Member -NotePropertyName name -NotePropertyValue $Name -Force }
     $Theme = Normalize-DreamSkinThemeContract -Theme $Theme
     $activeCss = Join-Path $paths.Active 'theme.css'
@@ -871,7 +900,7 @@ function Invoke-DreamSkinThemeReplacementRecovery {
 function Set-DreamSkinPaused {
   param(
     [Parameter(Mandatory = $true)][bool]$Paused,
-    [string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin')
+    [string]$StateRoot = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent)
   )
   $paths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $paths.Root -Root $paths.Root
@@ -886,7 +915,7 @@ function Set-DreamSkinPaused {
 }
 
 function Test-DreamSkinPaused {
-  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'))
+  param([string]$StateRoot = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent))
   return (Test-Path -LiteralPath (Get-DreamSkinThemePaths -StateRoot $StateRoot).PauseFile -PathType Leaf)
 }
 

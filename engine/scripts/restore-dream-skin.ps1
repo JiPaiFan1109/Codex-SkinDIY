@@ -23,12 +23,13 @@ try {
   }
   Assert-DreamSkinPort -Port $Port
 
-  $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'
+  $StateRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
   $language = Resolve-DreamSkinLanguage -StateRoot $StateRoot
   $themePaths = Get-DreamSkinThemePaths -StateRoot $StateRoot
   Ensure-DreamSkinManagedDirectory -Path $themePaths.Root -Root $themePaths.Root
   $StatePath = Join-Path $StateRoot 'state.json'
   $state = Read-DreamSkinState -Path $StatePath
+  if(-not $state){$state=Read-DreamSkinRecoveryIntent -StateRoot $StateRoot}
   if (-not $PortExplicit -and $null -ne $state -and $state.port) {
     $Port = [int]$state.port
     Assert-DreamSkinPort -Port $Port
@@ -136,6 +137,7 @@ try {
       Write-Host "Archived the completed pre-install backup at $archivePath"
     }
 
+    Clear-DreamSkinRecoveryIntent -StateRoot $StateRoot
     Remove-Item -LiteralPath $StatePath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $StateRoot 'paused') -Force -ErrorAction SilentlyContinue
 

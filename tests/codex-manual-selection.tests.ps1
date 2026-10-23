@@ -1,5 +1,6 @@
-$ErrorActionPreference='Stop'
+﻿$ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot '../engine/scripts/common-windows.ps1')
+
 . (Join-Path $PSScriptRoot '../engine/scripts/theme-windows.ps1')
 function Assert($Condition,$Message){if(-not $Condition){throw $Message}}
 $root=Join-Path ([IO.Path]::GetTempPath()) ('codex-manual-selection-'+[guid]::NewGuid().ToString('N'))
@@ -17,7 +18,10 @@ try{
   Assert ($manual.Executable -eq $exe -and $manual.PackageFullName -eq $install.PackageFullName) 'Manual selection did not persist only the validated identity'
   $previousLocalAppData=$env:LOCALAPPDATA
   $env:LOCALAPPDATA=$root
-  $stateDir=Join-Path $root 'CodexDynamicSkin';[IO.Directory]::CreateDirectory($stateDir)|Out-Null
+  $stateDir=Join-Path $root 'CodexDynamicSkin';[IO.Directory]::CreateDirectory((Join-Path $stateDir 'engine/scripts'))|Out-Null
+  Copy-Item (Join-Path $PSScriptRoot '../engine/scripts/common-windows.ps1') (Join-Path $stateDir 'engine/scripts/common-windows.ps1')
+  foreach($dependency in @('loopback-http.ps1','config-utf8.ps1')){Copy-Item (Join-Path $PSScriptRoot ('../engine/scripts/'+$dependency)) (Join-Path $stateDir ('engine/scripts/'+$dependency))}
+  . (Join-Path $stateDir 'engine/scripts/common-windows.ps1')
   $install.PackageFullName=Split-Path $root -Leaf
   $manualPayload=[pscustomobject]@{Executable=$install.Executable;PackageFullName=$install.PackageFullName;AppUserModelId=$install.AppUserModelId}
   $manualPayload|ConvertTo-Json -Compress|Set-Content (Join-Path $stateDir 'codex-manual.json') -Encoding utf8

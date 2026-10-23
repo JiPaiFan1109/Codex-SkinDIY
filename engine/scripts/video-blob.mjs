@@ -75,7 +75,7 @@ export async function installVideoBlob(session, videoConfig) {
   })()`);
   if (initial.present) return;
   const cacheConfig = { fileSize: videoConfig.fileSize, fileSha256: videoConfig.fileSha256 };
-  if (await session.evaluate(`(${restoreVideoCache.toString()})(${JSON.stringify(cacheConfig)}, ${JSON.stringify(key)}, ${JSON.stringify(initial.token)})`)) return;
+  if (videoConfig.persistentCache !== false && await session.evaluate(`(${restoreVideoCache.toString()})(${JSON.stringify(cacheConfig)}, ${JSON.stringify(key)}, ${JSON.stringify(initial.token)})`)) return;
   const bytes = await readVerified(videoConfig, key);
   const generation = randomUUID();
   const tokenLiteral = JSON.stringify(initial.token);
@@ -121,7 +121,7 @@ export async function installVideoBlob(session, videoConfig) {
         }
         delete s.videoUpload;
         if (previousUrl && previousUrl !== url) URL.revokeObjectURL(previousUrl);
-        void (${persistVideoCache.toString()})(blob, ${JSON.stringify(cacheConfig)});
+        if (${videoConfig.persistentCache !== false}) void (${persistVideoCache.toString()})(blob, ${JSON.stringify(cacheConfig)});
         return true;
       } catch (error) {
         URL.revokeObjectURL(url);

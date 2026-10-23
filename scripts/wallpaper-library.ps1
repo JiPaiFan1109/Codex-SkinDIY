@@ -55,7 +55,7 @@ function Get-DynamicWallpaperDirectory {
 
 function Read-DynamicWallpaperItem {
   param([string]$Directory,[string]$Id)
-  $item=[pscustomobject]@{Id=$Id;Name='不可用壁纸';Kind='Unknown';MediaPath=$null;ThumbnailPath=$null;Size=0L;Sha256=$null;ImportedAtUtc=[datetime]::MinValue;IsAvailable=$false;Error=$null;DiskSize=0L;Sources=@('Local');Transparency=0;PreviewLevel=50}
+  $item=[pscustomobject]@{Id=$Id;Name='不可用壁纸';Kind='Unknown';MediaPath=$null;ThumbnailPath=$null;Size=0L;Sha256=$null;ImportedAtUtc=[datetime]::MinValue;IsAvailable=$false;Error=$null;DiskSize=0L;Sources=@('Local');Transparency=0;PreviewLevel=50;External=$false}
   try {
     Assert-DreamSkinNoReparseComponents -Path $Directory
     $json=Join-Path $Directory 'item.json'
@@ -84,6 +84,11 @@ function Read-DynamicWallpaperItem {
     if($item.Size -le 0 -or $item.Size -gt $limit){throw '壁纸大小无效。'}
     $item.ImportedAtUtc=[datetime]::Parse([string]$entry.importedAtUtc,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
     $item.MediaPath=Join-Path $Directory $entry.mediaFile
+    if($entry.storage -eq 'SteamReference'){
+      $item.External=$true
+      if(-not [IO.Path]::IsPathRooted([string]$entry.sourcePath) -or $item.Sources -notcontains 'WallpaperEngine'){throw 'Steam 壁纸引用无效。'}
+      $item.MediaPath=[IO.Path]::GetFullPath([string]$entry.sourcePath)
+    }
     $item.ThumbnailPath=Join-Path $Directory $entry.thumbnailFile
     foreach($file in @($item.MediaPath,$item.ThumbnailPath)){Assert-DreamSkinNoReparseComponents -Path $file}
     if(-not (Test-Path -LiteralPath $item.MediaPath -PathType Leaf) -or (Get-Item -LiteralPath $item.MediaPath).Length -ne $item.Size){throw '壁纸文件丢失或大小已改变。'}
@@ -113,7 +118,12 @@ function Get-DynamicWallpaperItems {
     if($directory.Name -cmatch '^[0-9a-f]{32}$'){
       if(($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){
         [pscustomobject]@{Id=$directory.Name;Name='不可用壁纸';Kind='Unknown';MediaPath=$null;ThumbnailPath=$null;Size=0;Sha256=$null;ImportedAtUtc=[datetime]::MinValue;IsAvailable=$false;Error='壁纸目录不能是重解析点。';DiskSize=0}
-      } else {Read-DynamicWallpaperItem $directory.FullName $directory.Name}
+      } else {
+        $entry=Read-DynamicWallpaperItem $directory.FullName $directory.Name
+        # External files can disappear after an unsubscribe or library unmount.
+        # Hide stale references; never delete anything in the Steam library.
+        if(-not $entry.External -or $entry.IsAvailable){$entry}
+      }
     }
   }) | Sort-Object ImportedAtUtc -Descending
   $orderFile=Join-Path $paths.Library 'order.json'
@@ -193,7 +203,7 @@ function Complete-DynamicWallpaperImport {
   if(-not $directory.StartsWith($paths.Staging+'\',[StringComparison]::OrdinalIgnoreCase)){throw '导入暂存位置无效。'}
   $displayName=Assert-DynamicWallpaperName $Name
   Invoke-DynamicWallpaperLock $StateRoot {
-    $existing=@(Get-DynamicWallpaperItems $StateRoot | Where-Object { $_.IsAvailable -and $_.Kind -eq $Prepared.Kind -and $_.Sha256 -eq $Prepared.Sha256 -and (Get-FileHash -LiteralPath $_.MediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $Prepared.Sha256 })
+    $existing=@(Get-DynamicWallpaperItems $StateRoot | Where-Object { -not $_.External -and $_.IsAvailable -and $_.Kind -eq $Prepared.Kind -and $_.Sha256 -eq $Prepared.Sha256 -and (Get-FileHash -LiteralPath $_.MediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $Prepared.Sha256 })
     if($existing.Count -gt 0){
       $source='Local';if($Prepared.ImportSource){$source=$Prepared.ImportSource}
       return [pscustomobject]@{Item=(Add-DynamicWallpaperSource $StateRoot $existing[0].Id $source);AlreadyExists=$true}
@@ -242,10 +252,10 @@ function Import-DynamicWallpaper {
   if($sourceInfo.PSIsContainer -or $sourceInfo.Length -le 0 -or $sourceInfo.Length -gt $sourceLimit){throw '媒体大小超出导入限制。'}
   $sourceHash=(Get-FileHash -LiteralPath $SourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
   foreach($existing in Get-DynamicWallpaperItems $StateRoot){
-    if($existing.IsAvailable -and $existing.Kind -eq $Kind){
+    if($existing.IsAvailable -and -not $existing.External -and $existing.Kind -eq $Kind){
       $metadata=Join-Path (Split-Path $existing.MediaPath) 'item.json'
       $entry=[IO.File]::ReadAllText($metadata)|ConvertFrom-Json
-      if(($existing.Sha256 -eq $sourceHash -or $entry.sourceSha256 -eq $sourceHash) -and (Get-FileHash -LiteralPath $existing.MediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $existing.Sha256){
+      if(-not $existing.External -and ($existing.Sha256 -eq $sourceHash -or $entry.sourceSha256 -eq $sourceHash) -and (Get-FileHash -LiteralPath $existing.MediaPath -Algorithm SHA256).Hash.ToLowerInvariant() -eq $existing.Sha256){
         return [pscustomobject]@{Item=(Add-DynamicWallpaperSource $StateRoot $existing.Id $Source);AlreadyExists=$true}
       }
     }
@@ -284,6 +294,7 @@ function Get-DynamicWallpaperStatus {
   param([string]$StateRoot)
   $status=[pscustomobject]@{Paused=$false;CurrentId=$null;HasExternalCurrent=$false;Error=$null}
   try {
+    if(Test-DreamSkinExternalSourceMissing -StateRoot $StateRoot){$status.Paused=$true;return $status}
     $status.Paused=Test-DreamSkinPaused -StateRoot $StateRoot
     $video=Read-DynamicCurrentVideo $StateRoot
     if($status.Paused){return $status}
@@ -295,7 +306,7 @@ function Get-DynamicWallpaperStatus {
       if(-not (Test-Path -LiteralPath $active -PathType Container)){return $status}
       $theme=Read-DreamSkinTheme -ThemeDirectory $active
       $hash=(Get-FileHash -LiteralPath $theme.ImagePath -Algorithm SHA256).Hash.ToLowerInvariant()
-      $matches=@($items|Where-Object { $_.Kind -eq 'Image' -and $_.Sha256 -eq $hash })
+      $matches=@($items|Where-Object { $_.Kind -eq 'Image' -and $_.Sha256 -eq $hash -and $(if($theme.Theme.externalSource){$_.External -and $_.MediaPath -ieq $theme.ImagePath}else{-not $_.External}) })
     }
     if($matches.Count){$status.CurrentId=$matches[0].Id}else{$status.HasExternalCurrent=$true}
   }catch{$status.Error=$_.Exception.Message}
@@ -317,7 +328,7 @@ function Use-DynamicWallpaper {
         try {Assert-DreamSkinImageFile -Path $item.ThumbnailPath; $preview=$item.ThumbnailPath} catch { }
       }
     }
-    $prepared=[pscustomobject]@{Kind=$item.Kind;Path=$item.MediaPath;Preview=$preview;Size=$item.Size;Sha256=$item.Sha256;ImageOpacity=(1-[Math]::Max(0.0,($item.PreviewLevel-50)/50.0));ImageShade=([Math]::Min(1.0,$item.PreviewLevel/50.0))}
+    $prepared=[pscustomobject]@{Kind=$item.Kind;Path=$item.MediaPath;Preview=$preview;Size=$item.Size;Sha256=$item.Sha256;External=$item.External;ImageOpacity=(1-[Math]::Max(0.0,($item.PreviewLevel-50)/50.0));ImageShade=([Math]::Min(1.0,$item.PreviewLevel/50.0))}
     Set-DynamicBackground -Prepared $prepared -StateRoot $StateRoot -Apply $Apply
     return $item
   }
@@ -346,7 +357,7 @@ function Remove-DynamicWallpaper {
 function Restore-DynamicWallpaperAppearance {
   param([string]$StateRoot,[scriptblock]$Restore)
   Invoke-DynamicWallpaperLock $StateRoot {
-    $hasSession=Test-Path -LiteralPath (Join-Path $StateRoot 'state.json')
+    $hasSession=(Test-Path -LiteralPath (Join-Path $StateRoot 'state.json')) -or (Test-Path -LiteralPath (Join-Path $StateRoot 'recovery-intent.json'))
     $hasTheme=(Test-Path -LiteralPath (Join-Path $StateRoot 'active-theme')) -or (Test-Path -LiteralPath (Join-Path $StateRoot 'video-theme.json'))
     if(-not $hasSession -and ((Test-DreamSkinPaused -StateRoot $StateRoot) -or -not $hasTheme)){return $true}
     $restored = & $Restore

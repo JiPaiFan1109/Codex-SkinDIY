@@ -1,4 +1,23 @@
+# 2.1.0 来源补充
+
+当前源码从公开 2.0.0 基线继续开发，包含安装目录、Steam 引用、稳定性恢复及弹窗改进。发布副本已快进至线上 1655efd，并保留其 README 修改。本机生产安装仍为 2.0.0。下方为历史记录。
+
 # 1.1.1 开发基线来源
+
+## 2.0.1 开发修复（2026-10-23）
+
+当前 `current/VERSION` 与 `current/package.json` 为 **2.0.1**。管理中心首次打开由只检测改为自动连接，健康连接复用、重启确认、取消及预览保护保留。8 项相关 Windows 脚本与 46 项 Node 测试通过。源码尚未打包、安装或发布；最新公开 Release 和既有构建仍为 **2.0.0**。安装版本本次未重新验收。详情见 `current/docs/fix-manager-autoconnect-2.0.1.md`（current 内文档请按目录定位）。下方 2.0.0 发布记录为已发布基线。
+
+
+## 当前核实状态（2026-10-23，以本段为准）
+
+- 仓库已更名为 `JiPaiFan1109/CodexPage`，仓库 ID 1397219904 保持不变；main 发布提交为 `3a4abe8504025da0eb8f0d0b0d0c437666b9e773`。
+- **CodexPage v2.0.0 已公开发布**，Release ID 421407725，地址 https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.0.0 。公开 latest API、6 个附件大小及 SHA-256 均已复核。
+- 最终构建目录为 `outputs/release-2.0.0-codexpage-final/`，71 项包清单通过；README 已使用新版界面示意图。46 项 Node 测试、相关 Windows 测试及隔离 1.2.1 → 2.0.0 升级/保留壁纸库/卸载验证通过。
+- 旧 `codex-skindiy` 仓库首页与 v2.0.0 页面均返回 HTTP 200 并跳转到 CodexPage；旧 latest/download/update.json 返回 2.0.0；更早的 Codex-Dynamic-Skin 安装包链接返回 HTTP 200。
+- 本次未覆盖本机生产安装、未重启 Codex。机器上仍是此前 2026-10-22 安装的同版本 2.0.0；需手动覆盖安装才能使用此次品牌更新。
+- 证据：`.local-evidence/release-2.0.0-codexpage/release-public.json`、`final-assets.json`、`transition-final.log`。以下旧记录仅作历史参考，其中“未发布”等描述不再代表当前状态。
+
 
 当前开发及本机安装版本为 **2.0.0**，本地构建为 `../outputs/release-2.0.0/`，未公开发布。基于 2026-10-22 公开的 1.2.1（提交 cec6509，构建 `../outputs/release-1.2.1-red-final/`），增加成功换壁纸误回滚修复。下文记录的是重建时的 1.1.1 来源，不代表当前工作文件仍与发行包逐字节一致。启动优化与验证见 `docs/audit-startup-2026-10-21.md`，更新修复与验证见 `docs/update-audit-2026-10-22.md`。
 

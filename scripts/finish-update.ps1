@@ -29,7 +29,7 @@ function Invoke-DynamicUpdateInstall {
   try{
     Assert-DynamicUpdateFile $setup $manifest
     if($Report){& $Report '正在安装更新，请稍候…'}
-    $process=Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/LOG="'+(Join-Path $Stage 'install.log')+'"')) -WindowStyle Hidden -PassThru
+    $process=Start-Process -FilePath $setup -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="'+[IO.Path]::GetFullPath($Root).TrimEnd('\')+'"'),('/LOG="'+(Join-Path $Stage 'install.log')+'"')) -WindowStyle Hidden -PassThru
     try{$process.WaitForExit();$exitCode=$process.ExitCode}finally{$process.Dispose()}
     if($exitCode -ne 0){throw ('安装未完成（代码 '+$exitCode+'）。请关闭占用程序后重试。安装日志：'+(Join-Path $Stage 'install.log'))}
     if($Report){& $Report '正在确认安装结果…'}
@@ -38,8 +38,6 @@ function Invoke-DynamicUpdateInstall {
 }
 
 if($MyInvocation.InvocationName -ne '.'){
-  $default=[IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin')).TrimEnd('\')
-  if([IO.Path]::GetFullPath($InstallRoot).TrimEnd('\') -ine $default){throw '不支持此安装目录的自动升级。'}
   $success=$false
   try{
     if($ReadyPath -and [IO.Path]::GetFullPath($ReadyPath) -ine (Join-Path $PSScriptRoot 'ui-ready')){throw '更新状态路径无效。'}

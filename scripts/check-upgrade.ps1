@@ -34,6 +34,7 @@ function Invoke-DynamicUpgradePreparation {
     $monitorProcesses=@($processes|Where-Object {$_.CommandLine -and ([string]$_.CommandLine).Replace('/','\').IndexOf($monitorPath.Replace('/','\'),[StringComparison]::OrdinalIgnoreCase) -ge 0})
     if(-not $nodes.Count -and -not $monitorProcesses.Count){return $null}
     $statePath=Join-Path $root 'state.json'
+    if(-not (Test-Path -LiteralPath $statePath -PathType Leaf)){$statePath=Join-Path $root 'recovery-intent.json'}
     $state=$null
     if($nodes.Count){
       if(-not(Test-Path -LiteralPath $statePath -PathType Leaf) -or (Get-Item -LiteralPath $statePath).Length -gt 64KB){return ($blocked+' 后台身份记录不存在或超出限制。')}

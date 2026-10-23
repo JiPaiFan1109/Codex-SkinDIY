@@ -8,7 +8,7 @@ if (-not (Get-Command Assert-DreamSkinNoReparseComponents -CommandType Function 
 }
 
 function Get-DreamSkinVideoPaths {
-  param([string]$StateRoot = (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'))
+  param([string]$StateRoot = (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent))
   return [pscustomobject]@{
     Config = Join-Path $StateRoot 'video-theme.json'
     Ready = Join-Path $StateRoot 'video-ready.json'

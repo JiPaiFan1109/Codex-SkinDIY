@@ -1,4 +1,4 @@
-﻿# Windows 安装应用
+# Windows 安装应用
 
 版本：1.0.0。目标为 Windows x64，用户已安装官方 Microsoft Store OpenAI.Codex 包。
 
@@ -12,7 +12,7 @@ CodexPage 通过现有 `Get-DreamSkinCodexInstall` 检测当前用户注册的�
 
 ## 安装、升级和卸载
 
-EXE 安装程序使用 Inno Setup，固定安装到 `%LOCALAPPDATA%\CodexDynamicSkin`，与原有引擎的状态目录约束一致。运行文件与壁纸库分别维护；安装和升级覆盖明确的应用文件，不清空壁纸库。桌面和开始菜单使用「CodexPage」名称及现有图标。
+安装器支持选择安装目录，重装默认沿用原目录；自动更新通过 /DIR 保持实际安装位置。
 
 EXE 安装不会接管用户原有的 Codex 桌面快捷方式；CodexPage 的「打开 Codex」和开始菜单的「打开换肤版 Codex」进入皮肤启动链路。原有 ZIP 安装方式仍沿用其兼容快捷方式处理。
 
@@ -34,6 +34,6 @@ EXE 安装不会接管用户原有的 Codex 桌面快捷方式；CodexPage 的�
 
 输出目录应为空，构建不会覆盖已有安装程序。默认下载并校验固定 Node.js 运行环境，也可使用 `-NodeRuntimePath` 指定已经校验过的官方可执行文件。输出 EXE、ZIP、各自的 SHA-256 文件及用于检查的 `app-package`。GitHub 仅上传 EXE、ZIP 和校验文件，不上传本地证据、构建工具或用户状态。
 
-`installer/verify-setup.ps1` 使用同一份安装定义编译隔离测试包，仅将固定安装目录改为临时目录、使用单独卸载登记 ID，并省略真实桌面/开始菜单入口。测试实际执行安装、升级和卸载，核对已安装文件哈希与壁纸库保留。生产安装程序拒绝通过 `/DIR` 更换目录。
+安装器支持选择安装目录，重装默认沿用原目录；自动更新通过 /DIR 保持实际安装位置。
 
 发行程序没有项目代码签名证书；Node.js 的上游签名验证不代表本项目 EXE 已签名。使用 Release 校验文件核对下载内容，不要求关闭 Windows 安全保护。

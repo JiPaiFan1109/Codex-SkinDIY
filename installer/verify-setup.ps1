@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([string]$PackagePath,[string]$IsccPath)
+param([string]$PackagePath,[string]$IsccPath,[switch]$SkipManagerLaunch)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'scripts/finish-update.ps1')
@@ -16,10 +16,10 @@ function Run-Setup($Path,$Arguments){
 }
 try{
   $version=(Get-Content (Join-Path $PackagePath 'VERSION') -Raw).Trim()
-  & $IsccPath /Q ("/DSourceRoot=$PackagePath") ("/DAppVersion=$version") ("/DTestInstallRoot=$installed") ("/O$root") (Join-Path $PSScriptRoot 'windows.iss')
+  & $IsccPath /Q ("/DSourceRoot=$PackagePath") ("/DAppVersion=$version") ("/DTestInstallRoot="+(Join-Path $root 'unused-default')) ("/O$root") (Join-Path $PSScriptRoot 'windows.iss')
   if($LASTEXITCODE -ne 0){throw 'Isolated setup compilation failed'}
   $setup=Join-Path $root 'Codex-Skin-Manager-Setup.exe'
-  Run-Setup $setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/LOG="'+(Join-Path $root 'install.log')+'"'))
+  Run-Setup $setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="'+$installed+'"'),('/LOG="'+(Join-Path $root 'install.log')+'"'))
   foreach($name in @('CodexSkinManager.exe','engine/runtime/node/node.exe','engine/launcher/CodexDynamicSkinLauncher.exe','appearance/skin-manager.ico','scripts/skin-manager.xaml','unins000.exe')){
     if(-not(Test-Path (Join-Path $installed $name))){throw "Installed application missing $name"}
   }
@@ -29,6 +29,7 @@ try{
     if((Get-FileHash $item.FullName).Hash -ne (Get-FileHash (Join-Path $PackagePath $relative)).Hash){throw "Installed file differs: $relative"}
   }
   # Exercise the actual installed EXE and its hidden PowerShell child, not just the XAML loader.
+  if(-not $SkipManagerLaunch){
   $manager=$null;$child=$null
   try{
     $manager=Start-Process -FilePath (Join-Path $installed 'CodexSkinManager.exe') -ArgumentList '--prepare-only' -WindowStyle Hidden -PassThru
@@ -51,6 +52,7 @@ try{
   }finally{
     if($child -and -not $child.HasExited){Stop-Process -Id $child.Id -Force}
     if($manager -and -not $manager.HasExited){Stop-Process -Id $manager.Id -Force}
+  }
   }
   New-Item (Join-Path $installed 'wallpaper-library') -ItemType Directory -Force|Out-Null
   $kept=Join-Path $installed 'wallpaper-library/user-image.txt'

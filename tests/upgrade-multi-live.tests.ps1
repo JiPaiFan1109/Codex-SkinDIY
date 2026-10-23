@@ -1,3 +1,4 @@
+﻿param([switch]$RecoveryIntentOnly)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'scripts/check-upgrade.ps1')
@@ -21,7 +22,9 @@ Start-Sleep -Seconds 60
   $monitorPath=Join-Path $fixtureRoot 'engine/scripts/multi-instance.ps1'
   [IO.File]::WriteAllText($monitorPath,$scriptText,[Text.UTF8Encoding]::new($true))
   [IO.File]::WriteAllText((Join-Path $fixtureRoot 'state.json'),(@{nodePath=$runtime;injectorPid=0;videoPid=0}|ConvertTo-Json))
-  $before=(Get-FileHash (Join-Path $fixtureRoot 'state.json')).Hash
+  if($RecoveryIntentOnly){Move-Item -LiteralPath (Join-Path $fixtureRoot 'state.json') -Destination (Join-Path $fixtureRoot 'recovery-intent.json')}
+  $savedName=if($RecoveryIntentOnly){'recovery-intent.json'}else{'state.json'}
+  $before=(Get-FileHash (Join-Path $fixtureRoot $savedName)).Hash
   $argsText='-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "'+$monitorPath+'" -StateRoot "'+$fixtureRoot+'"'
   $supervisor=Start-Process (Join-Path $PSHOME 'powershell.exe') -ArgumentList $argsText -WindowStyle Hidden -PassThru
   $deadline=[datetime]::UtcNow.AddSeconds(15)
@@ -34,7 +37,7 @@ Start-Sleep -Seconds 60
   $reason=Invoke-DynamicUpgradePreparation $fixtureRoot
   if($reason){throw $reason}
   if((Get-Process -Id $supervisor.Id,$childId -ErrorAction SilentlyContinue)){throw 'Verified supervisor or worker survived upgrade preparation'}
-  if((Get-FileHash (Join-Path $fixtureRoot 'state.json')).Hash -ne $before){throw 'Saved state was changed'}
+  if((Get-FileHash (Join-Path $fixtureRoot $savedName)).Hash -ne $before){throw 'Saved state was changed'}
   'PASS real isolated PowerShell supervisor and native worker exit; saved wallpaper state preserved'
 }finally{
   if($supervisor){if(-not $supervisor.HasExited){$supervisor.Kill();$supervisor.WaitForExit()};$supervisor.Dispose()}

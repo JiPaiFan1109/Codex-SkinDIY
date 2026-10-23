@@ -58,6 +58,10 @@ try {
   Reject {Restore-DynamicWallpaperAppearance $root {throw 'restore failed'}}
   Reject {Remove-DynamicWallpaper $root $video.Id}
   Restore-DynamicWallpaperAppearance $root {Set-DreamSkinPaused -Paused $true -StateRoot $root|Out-Null}
+  [IO.File]::WriteAllText((Join-Path $root 'recovery-intent.json'),'{}')
+  $script:restoreCalled=$false
+  Restore-DynamicWallpaperAppearance $root {$script:restoreCalled=$true;Remove-Item -LiteralPath (Join-Path $root 'recovery-intent.json');return $true}|Out-Null
+  Assert $script:restoreCalled 'Paused session with recovery intent must still run restoration'
   Remove-DynamicWallpaper $root $video.Id
   Assert (-not (Test-Path -LiteralPath $video.MediaPath)) 'Restored video could not be deleted'
   Use-DynamicWallpaper $root $image.Id {}|Out-Null

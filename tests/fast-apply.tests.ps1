@@ -9,11 +9,13 @@ function Get-DreamSkinVerifiedCdpIdentity { [pscustomobject]@{BrowserId='test-br
 function Get-DreamSkinFastResumeCandidate {if(-not $script:watcherStopped){return $fastState}}
 function Invoke-DreamSkinNative {param($FilePath,$ArgumentList);$script:observed=@($ArgumentList);[pscustomobject]@{ExitCode=0;Output=@('{}')} }
 function Write-DreamSkinUtf8FileAtomically {}
+function Write-DreamSkinRecoveryIntent {param($StateRoot,$State);if($State.browserId -ne 'test-browser'){throw 'Wrong recovery identity'};$script:intentWrites++}
 function Start-DreamSkinInstanceMonitor {param($StateRoot);$script:monitorStarts++}
 function Write-DreamSkinStartResult {param($StateRoot,$Token,$Outcome,$Category,$AppearanceRecovery);$script:result=$Outcome}
 $fastState=[pscustomobject]@{port=9345;browserId='test-browser';themeDir='C:\Skin\active-theme';videoPid=$null;videoReadyPath=$null}
 $node=[pscustomobject]@{Path='node.exe'};$Injector='injector.mjs';$StateRoot='C:\Skin';$currentCodex=@{};$startupTimer=[Diagnostics.Stopwatch]::StartNew()
 $script:monitorStarts=0
+$script:intentWrites=0
 foreach($apply in @($false,$true)){
   $ResultToken=if($apply){'123'}else{$null};$script:result=$null
   & ([scriptblock]::Create($branch[0].Extent.Text.Replace('exit 0','return')))
@@ -26,4 +28,5 @@ $script:watcherStopped=$true;$ResultToken='123';$script:result=$null
 & ([scriptblock]::Create($branch[0].Extent.Text.Replace('exit 0','return')))
 if($script:result -eq 'success'){throw 'Exited watcher must fall back instead of reporting success'}
 if($script:monitorStarts -ne 2){throw 'Failed fast path must not start another monitor'}
+if($script:intentWrites -ne 2){throw 'Only successful fast paths must retain recovery intent'}
 'PASS actual fast apply installs and reports success; static open verifies without a video argument'

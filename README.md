@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="appearance/codexpage-wordmark.png" width="480" alt="CodexPage">
 </p>
 <p align="center">为你的 Codex 换上喜欢的图片或动态背景。导入、预览、切换，在一个窗口里完成。</p>
@@ -22,11 +22,11 @@
 
 CodexPage 2.0.0 界面示意图：以 3 行 × 4 列展示 12 张示例壁纸，呈现完整画廊布局（示例素材不随软件预置）。[查看完整截图](docs/images/skin-manager-v2.0.0.png)。
 
-- **Wallpaper Engine 导入**：左侧入口自动发现 Steam 库，批量复制视频/图片项目；Scene、Web、应用项目暂不支持。
+- **Wallpaper Engine 导入**：左侧入口自动发现 Steam 库，直接引用视频/图片源文件，仅保存索引和缩略图；Scene、Web、应用项目暂不支持。
 - **静态与动态背景**：导入本地图片或视频，为 Codex 更换背景。
 - **壁纸收藏库**：卡片浏览、静态/动态分类、大图预览、视频静音播放；支持重命名和删除。
 - **自动识别 Codex**：打开 CodexPage 即可检测本机客户端，点击「应用壁纸」或「打开 Codex」进入换肤流程。
-- **保留收藏，随时恢复**：导入后移动原文件不影响收藏；升级保留壁纸库，可恢复 Codex 原始外观。
+- **保留收藏，随时恢复**：本地导入会保存副本，移动原文件不影响收藏；Steam 引用源文件删除后会从列表消失，下次打开 Codex 回到初始外观；升级保留壁纸库，可恢复 Codex 原始外观。
 
 <details>
 <summary>查看 Codex 动态背景效果</summary>
@@ -41,10 +41,11 @@ CodexPage 2.0.0 界面示意图：以 3 行 × 4 列展示 12 张示例壁纸，
 
 ## 重要更新
 
-> **2.0.0 升级须知：此次更新请前往 [GitHub 发布页](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.0.0) 下载 `Codex-Skin-Manager-Setup.exe`，先退出 CodexPage，再运行安装包覆盖升级。暂勿点击旧版中的「立即更新」；无需卸载，壁纸库和设置保留。**
+> **2.1.0 升级须知：此次更新请前往 [GitHub 发布页](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.1.0) 下载 `Codex-Skin-Manager-Setup.exe`，先退出 CodexPage，再运行安装包覆盖升级。暂勿点击旧版中的「立即更新」；无需卸载，壁纸库和设置保留。**
 
 | 日期（北京时间） | 版本 | 更新内容 |
 | --- | --- | --- |
+| 2026-10-23 | [2.1.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.1.0) | 自选安装目录、Steam 源文件引用、失效壁纸隐藏、启动恢复与弹窗改进 |
 | 2026-10-23 | [2.0.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.0.0) | 正式更名 CodexPage，更新艺术字与界面说明，修复成功换壁纸后误回滚，保留壁纸库与设置 |
 | 2026-10-22 | [1.2.1](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v1.2.1) | 修复升级时 CodexPage 无法退出、安装辅助进程异常退出或启动超时后的恢复问题；补齐视频缓存依赖；新版界面以深红色强调手动升级提示（旧版仍显示普通文字） |
 | 2026-10-22 | [1.2.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v1.2.0) | 修复微软商店版 Codex 连接状态误报，支持重新建立连接和手动定位 Codex，改善连接失败诊断 |
@@ -87,7 +88,7 @@ CodexPage 2.0.0 界面示意图：以 3 行 × 4 列展示 12 张示例壁纸，
 
 ### 升级、卸载与常见问题
 
-- **升级至 2.0.0**：请从 [GitHub 发布页](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.0.0) 下载安装包，退出 CodexPage 后覆盖安装，暂勿使用旧版「立即更新」。无需卸载，壁纸库与设置保留；完成后重新应用壁纸即可恢复换肤连接。CodexPage 打开时每天最多自动检查一次，支持稍后和跳过此版本；应用未运行时不会推送通知。
+- **升级至 2.1.0**：请从 [GitHub 发布页](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.1.0) 下载安装包，退出 CodexPage 后覆盖安装，暂勿使用旧版「立即更新」。无需卸载，壁纸库与设置保留；完成后重新应用壁纸即可恢复换肤连接。CodexPage 打开时每天最多自动检查一次，支持稍后和跳过此版本；应用未运行时不会推送通知。
 - **卸载**：从 Windows「已安装的应用」卸载。卸载前会执行外观恢复；取消或失败时停止卸载。壁纸库默认保留。
 - **未找到 Codex**：确认当前 Windows 用户已安装官方 Store 版客户端，再点击左下角连接图标重试。
 - **从官方入口打开后没有皮肤**：回到 CodexPage 重新应用壁纸，按提示处理正在运行的会话。
@@ -98,7 +99,7 @@ CodexPage 2.0.0 界面示意图：以 3 行 × 4 列展示 12 张示例壁纸，
 <details>
 <summary>运行环境、数据位置及兼容安装方式（日常使用可跳过）</summary>
 
-- 安装位置固定为 `%LOCALAPPDATA%\CodexDynamicSkin`，无需管理员权限；壁纸库位于其中的 `wallpaper-library`。
+- 安装时可选择有写入权限的目录，默认 `%LOCALAPPDATA%\CodexDynamicSkin`，无需管理员权限；壁纸库位于所选目录中的 `wallpaper-library`。重装默认沿用原目录，自动更新写回当前目录；更换目录不会自动迁移旧壁纸库。
 - 通过本机注册的官方 Codex 安装信息完成检测，并由本地引擎启动和应用背景。绿色连接状态表示已核验真实调试会话；找到安装但未建立连接时仍可通过应用壁纸启动连接。
 - 默认安装、启动和恢复流程不改写全局 `%USERPROFILE%\.codex\config.toml`。兼容旧状态的恢复保护逻辑仍保留。
 - 安装包包含固定版本 Node.js 24.19.0 x64 及其许可证，构建时核对 SHA-256 和 OpenJS Foundation 签名。本项目 EXE 尚无项目代码签名证书；上游 Node.js 签名不代表安装程序已签名，不要求关闭 Windows 安全保护。
@@ -123,3 +124,5 @@ CodexPage 2.0.0 界面示意图：以 3 行 × 4 列展示 12 张示例壁纸，
 <p align="center">
   <a href="docs/images/wechat-donation.jpg"><img src="docs/images/wechat-donation.jpg" alt="微信支付收款码" width="316"></a>
 </p>
+
+Steam 直接引用仅支持可直接播放的 H.264 MP4（≤1080p/60fps、≤128 MiB），不自动转码，也不写入持久视频缓存；其他视频可通过本地导入转换并保存副本。Steam 盘离线同样视为源文件不可用，重新连接后可刷新列表。旧版 Steam 专用副本会在刷新且核对原文件一致后转为引用，正在使用的副本暂缓清理。

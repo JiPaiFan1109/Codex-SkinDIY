@@ -6,7 +6,7 @@ function Invoke-DynamicUninstallRestore {
   param([string]$InstallRoot,[switch]$Silent)
   # A restored manager retains theme files, but marks the appearance inactive.
   $hasTheme=(Test-Path (Join-Path $InstallRoot 'video-theme.json')) -or (Test-Path (Join-Path $InstallRoot 'active-theme'))
-  $hasSkin=(Test-Path (Join-Path $InstallRoot 'state.json')) -or
+  $hasSkin=(Test-Path (Join-Path $InstallRoot 'state.json')) -or (Test-Path (Join-Path $InstallRoot 'recovery-intent.json')) -or
     ($hasTheme -and -not (Test-Path (Join-Path $InstallRoot 'paused')))
   if(-not $hasSkin){return $true}
   if($Silent){throw '请先在 CodexPage 恢复原始外观，再执行静默卸载。'}

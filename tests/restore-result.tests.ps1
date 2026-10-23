@@ -3,7 +3,7 @@ $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $repo 'scripts/media.ps1');Initialize-DynamicMedia -InstallRoot $repo
 $root=Join-Path ([IO.Path]::GetTempPath()) ('restore-result-'+[guid]::NewGuid().ToString('N'))
 try{
-  $scripts=Join-Path $root 'scripts';[IO.Directory]::CreateDirectory($scripts)|Out-Null
+  $scripts=Join-Path $root 'CodexDynamicSkin/engine/scripts';[IO.Directory]::CreateDirectory($scripts)|Out-Null
   foreach($name in @('common-windows.ps1','config-utf8.ps1','loopback-http.ps1','restore-dream-skin.ps1')){Copy-Item -LiteralPath (Join-Path $repo "engine/scripts/$name") -Destination $scripts}
   # Replace process/installation discovery boundaries; execute the real restore control flow.
   [IO.File]::WriteAllText((Join-Path $scripts 'theme-windows.ps1'),@'
@@ -11,7 +11,7 @@ function Enter-DreamSkinOperationLock {return $null}
 function Exit-DreamSkinOperationLock {param($Mutex)}
 function Get-DreamSkinThemePaths {param($StateRoot);return @{Root=$StateRoot}}
 function Ensure-DreamSkinManagedDirectory {param($Path,$Root);[IO.Directory]::CreateDirectory($Path)|Out-Null}
-function Read-DreamSkinState {param($Path);return $null}
+function Read-DreamSkinState {param($Path);if($Path.EndsWith('recovery-intent.json')){return [IO.File]::ReadAllText($Path)|ConvertFrom-Json};return $null}
 function Get-DreamSkinCodexInstall {return @{Executable='fake.exe';PackageRoot='fake'}}
 function Get-DreamSkinCodexStatePathCandidate {param($State);return $null}
 function Get-DreamSkinCodexInstallFromState {param($State);return $null}
@@ -19,13 +19,16 @@ function Get-DreamSkinCodexProcesses {param($Codex);if($env:SKIN_RESTORE_TEST_CA
 function Test-DreamSkinCodexPortOwner {param($Port,$Codex);return $false}
 function Test-DreamSkinPortAvailable {param($Port);return $true}
 function Confirm-DreamSkinRestart {param($Message);return $false}
-function Stop-DreamSkinRecordedInjector {param($State);return $true}
-function Stop-DreamSkinRecordedVideo {param($State);return $true}
+function Stop-DreamSkinRecordedInjector {param($State);if($State.injectorPid -ne 123){throw 'Restore lost recovery injector identity'};return $true}
+function Stop-DreamSkinRecordedVideo {param($State);if($State.videoPid -ne 456){throw 'Restore lost recovery video identity'};return $true}
 function Stop-DreamSkinCodex {throw 'Test must not stop any real process'}
 '@,(New-Object Text.UTF8Encoding($true)))
   [IO.File]::WriteAllText((Join-Path $scripts 'localization-windows.ps1'),'function Resolve-DreamSkinLanguage {return ''en''}; function Get-DreamSkinText {param($Key,$Language);return $Key}')
   [IO.File]::WriteAllText((Join-Path $scripts 'video-windows.ps1'),'# All process boundaries stubbed in theme fixture.')
   foreach($cancel in @($false,$true)){
+    $intentRoot=Join-Path $root 'CodexDynamicSkin'
+    [IO.Directory]::CreateDirectory($intentRoot)|Out-Null
+    Write-DreamSkinRecoveryIntent $intentRoot ([pscustomobject]@{schemaVersion=1;port=9345;injectorPid=123;videoPid=456})
     $token=[guid]::NewGuid().ToString('N')
     $info=New-Object Diagnostics.ProcessStartInfo
     $info.FileName='powershell.exe';$info.UseShellExecute=$false;$info.CreateNoWindow=$true
@@ -39,6 +42,7 @@ function Stop-DreamSkinCodex {throw 'Test must not stop any real process'}
     if($cancel -and $result.outcome -eq 'success'){throw 'Cancelled real restore emitted success'}
     if($cancel -and $result.category -ne 'cancelled'){throw 'Cancelled restore must be distinguishable from failure'}
     if(-not $cancel -and $result.outcome -ne 'success'){throw 'Successful real restore did not emit success'}
+    if((Test-Path (Join-Path $intentRoot 'recovery-intent.json')) -ne $cancel){throw 'Only confirmed restore may clear recovery intent'}
   }
   'PASS: real restore control flow emits success only after completion, cancellation stays unsuccessful'
 }finally{if(Test-Path $root){Remove-Item -LiteralPath $root -Recurse -Force}}

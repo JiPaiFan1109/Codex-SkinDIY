@@ -40,18 +40,20 @@ try{
               Start-DynamicManagerWork Import (Join-Path $repo 'docs/media/earth-demo.mp4');$script:qa.Step=2
             }
             2 {
-              Assert ($ui.Items.Count -eq 2 -and $ui.Selected.Kind -eq 'Video') 'Video import did not select new card'
-              Assert ($ui.Controls.SelectedFormat.Text -like '*MP4*' -and $ui.Controls.SelectedSize.Text -like '*MB*') 'Gallery file details did not update'
+              Assert ($ui.Items.Count -eq 2 -and $ui.Filter -eq 'Image') ('Video import must preserve the explicit image filter: '+$ui.Controls.StatusText.Text)
               $ui.Controls.VideoFilter.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
               Assert ($ui.Controls.WallpaperList.Items.Count -eq 1) 'Video filter failed through UI'
-              $ui.Controls.PlayButton.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
+              $ui.Controls.WallpaperList.SelectedIndex=0
+              Assert ($ui.Selected.Kind -eq 'Video') 'Video selection failed'
+              Assert ($ui.Controls.SelectedFormat.Text -like '*MP4*' -and $ui.Controls.SelectedSize.Text -like '*MB*') 'Gallery file details did not update'
+              Show-DynamicCodexPreview
               $script:qa.Step=3
             }
             3 {
               if(-not $script:qa.MediaOpened){return}
               Assert $ui.Playing 'Media did not enter playing state'
               $media=$ui.Selected.MediaPath
-              Stop-DynamicManagerPreview
+              Close-DynamicCodexPreview
               Assert ($null -eq $ui.Controls.PreviewVideo.Source -and -not $ui.Playing) 'Preview did not release source'
               $handle=[IO.File]::Open($media,'Open','ReadWrite','None');$handle.Dispose()
               Start-DynamicManagerWork Rename $ui.Selected.Id '我的地球动态壁纸'
@@ -78,6 +80,8 @@ try{
             }
             5 {
               Assert ($ui.Items.Count -eq 1) 'Stopped video could not be deleted'
+              $ui.Controls.VideoFilter.RaiseEvent([Windows.RoutedEventArgs]::new([Windows.Controls.Button]::ClickEvent))
+              Assert ($ui.Filter -eq 'All') 'Second click must clear the explicit video filter'
               Assert (-not (Test-Path (Join-Path $root 'active-theme'))) 'PrepareOnly UI changed background'
               $project=Join-Path $root 'renamed collection/project'
               [IO.Directory]::CreateDirectory($project)|Out-Null
@@ -115,7 +119,7 @@ try{
             }
           }
         }catch{
-          $script:qa.Error=$_.Exception.ToString();$script:qa.Timer.Stop()
+          $script:qa.Error="Step $($script:qa.Step): $($_.Exception.ToString()) $($_.InvocationInfo.PositionMessage)";$script:qa.Timer.Stop()
           if(-not $ui.Busy){$ui.Window.Close()}
         }
       })

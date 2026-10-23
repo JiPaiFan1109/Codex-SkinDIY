@@ -39,6 +39,16 @@ function Get-DynamicCodexConnection {
   }
 }
 
+function Start-DynamicManagerStartup {
+  $ui=$script:SkinManager
+  if($ui.StartupStarted -or $ui.Busy){return}
+  # ContentRendered can fire again. Never repeat a cancelled connection prompt.
+  $ui.StartupStarted=$true
+  if($ui.PrepareOnly){Start-DynamicManagerWork Refresh;return}
+  # Open checks fresh identity in the worker and reuses a healthy connection.
+  Start-DynamicManagerWork Open
+}
+
 function Start-DynamicCodexConnectionWork {
   $ui=$script:SkinManager
   if($ui.Busy){return}
@@ -84,6 +94,11 @@ function Connect-DynamicCodex {
   param([Parameter(Mandatory)][string]$StateRoot)
   # Recheck in the worker: the icon's last result may already be stale.
   $connection=Get-DynamicCodexConnection -StateRoot $StateRoot
+  if($connection.Available -and (Test-DreamSkinExternalSourceMissing -StateRoot $StateRoot)){
+    Invoke-DynamicEngine -StateRoot $StateRoot
+    $connection.Message='Steam 壁纸源文件已移除，已打开 Codex 初始外观。'
+    return [pscustomobject]@{Connection=$connection;Cancelled=$false;Error=$null}
+  }
   $cancelled=$false;$failure=$null
   if(-not $connection.Available){$failure=$connection.Message}
   elseif(-not $connection.Connected){
@@ -471,6 +486,7 @@ function Start-DynamicManagerWork {
         if($restored -eq $false){$message='已取消恢复。';$cancelled=$true}
       }
       'Refresh' { }
+      'LibrarySync' { }
       default {throw '未知管理操作。'}
     }}catch{
       if(-not (Test-DynamicOperationCancelled $_.Exception)){throw}
@@ -530,19 +546,35 @@ function Complete-DynamicManagerWork {
   if($connectionFailure){Show-DynamicManagerConfirmation -Title 'Codex 连接未完成' -Message $connectionFailure -Action {} -AcceptText '知道了' -NoticeOnly}
 }
 
+function New-DynamicRenameWindow {
+  param($Owner,[string]$Name)
+  $dialog=[Windows.Window]::new()
+  $dialog.Title='重命名壁纸';$dialog.Width=496;$dialog.SizeToContent='Height';$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner';$dialog.Background=[Windows.Media.Brushes]::White
+  if($Owner){$dialog.Resources=$Owner.Resources;$dialog.FontFamily=$Owner.FontFamily;if($Owner.IsVisible){$dialog.Owner=$Owner}}
+  $dialog.FontSize=15
+  $panel=[Windows.Controls.StackPanel]::new();$panel.Margin='32';$dialog.Content=$panel
+  $heading=[Windows.Controls.TextBlock]::new();$heading.Text='重命名壁纸';$heading.FontSize=22;$heading.FontWeight='SemiBold';$heading.Margin='0,0,0,12'
+  $label=[Windows.Controls.Label]::new();$label.Content='壁纸名称';$label.Padding='0';$label.Margin='0,0,0,10';$label.Foreground=[Windows.Media.BrushConverter]::new().ConvertFromString('#526B89')
+  $field=[Windows.Controls.TextBox]::new();$field.Name='RenameInput';$field.Text=$Name;$field.MaxLength=240;$field.Padding='12,10';$field.Margin='0,0,0,24';$field.BorderBrush=[Windows.Media.BrushConverter]::new().ConvertFromString('#BCCCE0');$label.Target=$field
+  $row=[Windows.Controls.StackPanel]::new();$row.Orientation='Horizontal';$row.HorizontalAlignment='Right'
+  $cancel=[Windows.Controls.Button]::new();$cancel.Content='取消';$cancel.IsCancel=$true;$cancel.MinWidth=104;$cancel.Height=46;$cancel.Margin='0,0,12,0';$cancel.Background=[Windows.Media.BrushConverter]::new().ConvertFromString('#E9EDF3')
+  $save=[Windows.Controls.Button]::new();$save.Content='保存名称';$save.IsDefault=$true;$save.MinWidth=132;$save.Height=46;$save.Style=$dialog.Resources['PrimaryButton']
+  foreach($button in @($cancel,$save)){$button.FontSize=14;$button.FontWeight='SemiBold'}
+  $save.IsEnabled=-not [string]::IsNullOrWhiteSpace($field.Text)
+  $field.Add_TextChanged({$save.IsEnabled=-not [string]::IsNullOrWhiteSpace($field.Text)}.GetNewClosure())
+  $save.Add_Click({$dialog.DialogResult=$true}.GetNewClosure())
+  $cancel.Add_Click({$dialog.DialogResult=$false}.GetNewClosure())
+  foreach($child in @($heading,$label,$field,$row)){[void]$panel.Children.Add($child)}
+  [void]$row.Children.Add($cancel);[void]$row.Children.Add($save)
+  $dialog.Tag=$field
+  $dialog.Add_ContentRendered({$field.SelectAll();[void]$field.Focus()}.GetNewClosure())
+  return $dialog
+}
 function Show-DynamicWallpaperRename {
   $ui=$script:SkinManager
-  $dialog=New-Object Windows.Window
-  $dialog.Title='重命名壁纸';$dialog.Owner=$ui.Window;$dialog.Width=400;$dialog.Height=180;$dialog.ResizeMode='NoResize';$dialog.WindowStartupLocation='CenterOwner'
-  $panel=New-Object Windows.Controls.StackPanel;$panel.Margin='20'
-  $input=New-Object Windows.Controls.TextBox;$input.Text=$ui.Selected.Name;$input.Margin='0,0,0,16';$input.Padding='8';$input.MaxLength=240
-  $save=New-Object Windows.Controls.Button;$save.Content='保存';$save.Padding='12,8';$save.IsDefault=$true
-  $save.Add_Click({$dialog.DialogResult=$true}.GetNewClosure())
-  $panel.Children.Add($input)|Out-Null;$panel.Children.Add($save)|Out-Null;$dialog.Content=$panel
-  $input.SelectAll();$input.Focus()|Out-Null
-  if($dialog.ShowDialog()){Start-DynamicManagerWork Rename $ui.Selected.Id $input.Text}
+  $dialog=New-DynamicRenameWindow -Owner $ui.Window -Name $ui.Selected.Name
+  if($dialog.ShowDialog()){Start-DynamicManagerWork Rename $ui.Selected.Id $dialog.Tag.Text}
 }
-
 function Show-DynamicSkinManager {
   param([string]$InstallRoot,[string]$StateRoot,[switch]$PrepareOnly)
   if([Threading.Thread]::CurrentThread.ApartmentState -ne 'STA'){throw 'CodexPage 需要在 STA 模式下运行，请使用 powershell.exe -STA 启动。'}
@@ -553,6 +585,19 @@ function Show-DynamicSkinManager {
   foreach($name in @('ConnectionLabel','ConnectionDetail','ConfirmationOverlay','ConfirmationTitle','ConfirmationMessage','ConfirmationScroll','ConfirmationCancelColumn','ConfirmationGapColumn','ConfirmAcceptButton','ConfirmCancelButton','ConfirmCloseButton','ToastPanel','ToastIcon','ToastIconBorder','ToastMessage')){$controls[$name]=$window.FindName($name)}
   $script:SkinManager=@{Window=$window;Controls=$controls;InstallRoot=$InstallRoot;StateRoot=$StateRoot;ModuleRoot=$PSScriptRoot;PrepareOnly=[bool]$PrepareOnly;Items=@();Status=[pscustomobject]@{CurrentId=$null;Paused=$false;HasExternalCurrent=$false;Error=$null};Selected=$null;Source='Local';Filter='All';Busy=$false;UpdateClosing=$false;Playing=$false;PromptShown=$false;Worker=$null;Runspace=$null;Async=$null}
   $timer=New-Object Windows.Threading.DispatcherTimer;$timer.Interval=[timespan]::FromMilliseconds(120);$timer.Add_Tick({Complete-DynamicManagerWork});$script:SkinManager.Timer=$timer
+  $sourceTimer=New-Object Windows.Threading.DispatcherTimer
+  $sourceTimer.Interval=[timespan]::FromSeconds(3)
+  $sourceTimer.Add_Tick({
+    $ui=$script:SkinManager
+    if(-not $ui -or $ui.Busy){return}
+    foreach($item in $ui.Items){
+      if($item.External -and -not (Test-Path -LiteralPath $item.MediaPath -PathType Leaf)){
+        Start-DynamicManagerWork LibrarySync
+        break
+      }
+    }
+  })
+  $script:SkinManager.SourceTimer=$sourceTimer;$sourceTimer.Start()
   $script:SkinManager.Connection=[pscustomobject]@{Available=$false}
   . (Join-Path $PSScriptRoot 'update-ui.ps1')
   Initialize-DynamicUpdateUI
@@ -617,10 +662,11 @@ function Show-DynamicSkinManager {
   $controls.PreviewVideo.Add_MediaEnded({$video=$script:SkinManager.Controls.PreviewVideo;$video.Position=[timespan]::Zero;$video.Play()})
   $controls.PreviewVideo.Add_MediaFailed({Stop-DynamicManagerPreview;$script:SkinManager.Controls.PreviewNotice.Text='本机无法播放此预览。文件仍保留，可尝试应用壁纸。'})
   Register-DynamicManagerClosingGuard $window
-  $window.Add_ContentRendered({if(-not $script:SkinManager.Async){Start-DynamicManagerWork Refresh}})
+  $window.Add_ContentRendered({Start-DynamicManagerStartup})
   try {Update-DynamicManagerButtons;$null=$window.ShowDialog()}
   finally {
     Save-DynamicManagerOpacity;$script:SkinManager.OpacityTimer.Stop()
+    $script:SkinManager.SourceTimer.Stop()
     Stop-DynamicManagerPreview;$timer.Stop()
     if($script:SkinManager.ToastTimer){$script:SkinManager.ToastTimer.Stop()}
     $script:SkinManager.UpdateTimer.Stop();$script:SkinManager.UpdateStartupTimer.Stop()
@@ -783,7 +829,7 @@ function Show-DynamicManagerConfirmation {
   $ui.Controls.ConfirmCancelButton.Visibility='Visible'
   $ui.Controls.ConfirmationCancelColumn.Width=[Windows.GridLength]::new(1,[Windows.GridUnitType]::Star)
   $ui.Controls.ConfirmationGapColumn.Width=[Windows.GridLength]::new(12)
-  $ui.Controls.ConfirmationMessage.TextAlignment='Center'
+  $ui.Controls.ConfirmationMessage.TextAlignment='Left'
   if($NoticeOnly){
     $ui.Controls.ConfirmCancelButton.Visibility='Collapsed'
     $ui.Controls.ConfirmationCancelColumn.Width=[Windows.GridLength]::new(0)

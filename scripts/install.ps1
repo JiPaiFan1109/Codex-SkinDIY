@@ -108,10 +108,6 @@ function Install-DynamicSkin {
   $source = [IO.Path]::GetFullPath($SourceRoot)
   $root = [IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
   if ($root -eq [IO.Path]::GetPathRoot($root).TrimEnd('\') -or $root -ieq $source -or $source.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase) -or $root.StartsWith($source.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe installation root.' }
-  $defaultRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin')).TrimEnd('\')
-  if (-not $SkipShortcuts -and $root -ine $defaultRoot -and [IO.Path]::GetFullPath($DesktopPath).TrimEnd('\') -ieq [Environment]::GetFolderPath('Desktop').TrimEnd('\')) {
-    throw 'Custom installation roots support only -SkipShortcuts or an isolated -DesktopPath for testing.'
-  }
   Assert-DynamicSkinTree $source
   if (-not $NodeRuntimePath) { $NodeRuntimePath = Join-Path $source 'engine/runtime/node/node.exe' }
   Assert-DynamicSkinNode $NodeRuntimePath (Join-Path $source 'scripts/node-runtime.json')

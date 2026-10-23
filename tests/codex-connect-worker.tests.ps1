@@ -11,12 +11,14 @@ try{
   [void][IO.Directory]::CreateDirectory($fixture)
   $media=@'
 function Initialize-DynamicMedia {param($InstallRoot)}
+function Test-DreamSkinExternalSourceMissing {param($StateRoot);return $false}
 function Get-DreamSkinCodexInstall {[pscustomobject]@{Version='26.1013.4894.0';Executable='C:\fixture\ChatGPT.exe'}}
 function Read-DreamSkinState {param($Path);if(Test-Path (Join-Path (Split-Path $Path -Parent) 'connected')){[pscustomobject]@{port=9345;browserId='fixture-id'}}}
 function Get-DreamSkinVerifiedCdpIdentityForAnyRegistered {param($Port);[pscustomobject]@{Identity=[pscustomobject]@{BrowserId='fixture-id'};Codex=[pscustomobject]@{Version='26.1013.4894.0'}}}
 function Invoke-DynamicEngine {
   param($StateRoot)
   $mode=[IO.File]::ReadAllText((Join-Path $StateRoot 'mode'))
+  if($mode -in @('healthy','preview')){throw 'Healthy/preview startup must never invoke engine'}
   if($mode -eq 'cancel'){throw [OperationCanceledException]::new('cancelled')}
   if($mode -eq 'failure'){throw '应用失败：cdp-endpoint-unavailable'}
   [IO.File]::WriteAllText((Join-Path $StateRoot 'connected'),'true')
@@ -32,19 +34,27 @@ function Test-DynamicOperationCancelled {param($Exception);while($Exception){if(
   $window=New-DynamicSkinManagerWindow
   $controls=@{}
   foreach($match in [regex]::Matches([IO.File]::ReadAllText((Join-Path $repo 'scripts/skin-manager.xaml')),'x:Name="([^"]+)"')){$controls[$match.Groups[1].Value]=$window.FindName($match.Groups[1].Value)}
-  foreach($mode in @('cancel','failure','success')){
+  foreach($mode in @('cancel','failure','success','healthy','preview')){
     [IO.File]::WriteAllText((Join-Path $fixture 'mode'),$mode)
     $script:SkinManager=@{Window=$window;Controls=$controls;ModuleRoot=$fixture;InstallRoot=$fixture;StateRoot=$fixture;Busy=$false;PrepareOnly=$false;Selected=$null;Status=[pscustomobject]@{Error=$null;CurrentId=$null};Connection=[pscustomobject]@{Available=$true;Connected=$false};Timer=[Windows.Threading.DispatcherTimer]::new()}
-    Start-DynamicCodexConnectionWork
-    Assert ($script:SkinManager.PendingOperation -eq 'Open' -and $script:SkinManager.Busy) 'Icon did not enter connection work'
+    $script:SkinManager.PrepareOnly=$mode -eq 'preview'
+    Start-DynamicManagerStartup
+    $expectedOperation=if($mode -eq 'preview'){'Refresh'}else{'Open'}
+    Assert ($script:SkinManager.PendingOperation -eq $expectedOperation -and $script:SkinManager.Busy) 'Startup did not enter connection work'
     Assert (-not $controls.OpenButton.IsEnabled -and $controls.ConnectionLoading.Visibility -eq 'Visible') 'Connecting must disable duplicate clicks and show loading'
+    Assert ($controls.ConnectionBadge.Visibility -eq 'Collapsed') 'Startup must not show a red cross while connecting'
+    $firstWorker=$script:SkinManager.Worker
+    Start-DynamicManagerStartup
+    Assert ([object]::ReferenceEquals($firstWorker,$script:SkinManager.Worker)) 'Repeated startup created another worker'
     $deadline=[datetime]::UtcNow.AddSeconds(15)
     while(-not $script:SkinManager.Async.IsCompleted){if([datetime]::UtcNow -gt $deadline){throw 'Worker timed out'};Start-Sleep -Milliseconds 30}
     Complete-DynamicManagerWork
-    Assert (-not $script:SkinManager.Busy -and $controls.OpenButton.IsEnabled) 'Worker did not restore click availability'
+    Assert (-not $script:SkinManager.Busy) 'Worker did not release busy state'
+    if($mode -ne 'preview'){Assert $controls.OpenButton.IsEnabled 'Worker did not restore click availability'}
     Assert ($controls.ConnectionLoading.Visibility -eq 'Collapsed') 'Spinner remained after connection finished'
-    if($mode -eq 'success'){
+    if($mode -in @('success','healthy','preview')){
       Assert ($script:SkinManager.Connection.Connected -and $controls.ConnectionLabel.Text -eq '连接成功') 'Successful worker did not update connection badge'
+      Assert ($controls.ConfirmationOverlay.Visibility -eq 'Collapsed') 'Healthy/preview startup unexpectedly invoked the engine'
     }elseif($mode -eq 'failure'){
       Assert (-not $script:SkinManager.Connection.Connected -and $controls.ConnectionLabel.Text -eq '已找到Codex') 'Failure reverted to misleading missing-install state'
       Assert ($controls.ConfirmationOverlay.Visibility -eq 'Visible' -and $controls.ConfirmationTitle.Text -eq 'Codex 连接未完成') 'Connection failure details were not displayed'
@@ -53,9 +63,11 @@ function Test-DynamicOperationCancelled {param($Exception);while($Exception){if(
     }else{
       Assert ($controls.StatusText.Text -eq '已取消连接。' -and $controls.ConfirmationOverlay.Visibility -eq 'Collapsed') 'Cancellation was presented as a failure'
     }
+    Start-DynamicManagerStartup
+    Assert ($null -eq $script:SkinManager.Worker -and -not $script:SkinManager.Busy) 'Completed/cancelled startup was retried automatically'
     if($script:SkinManager.ToastTimer){$script:SkinManager.ToastTimer.Stop()}
   }
-  'PASS actual worker/completion: cancellation, startup failure, verified success, loading and duplicate-click protection'
+  'PASS automatic startup worker: cancellation, failure, verified success, healthy reuse, read-only preview, loading and one-shot protection'
 }finally{
   if($script:SkinManager.Worker){$script:SkinManager.Worker.Stop();$script:SkinManager.Worker.Dispose()}
   if($script:SkinManager.Runspace){$script:SkinManager.Runspace.Dispose()}

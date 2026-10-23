@@ -44,6 +44,28 @@ function Invoke-DreamSkinStartupAppearanceRecovery {
   }
 }
 
+function Test-DreamSkinPendingVerificationOutput {
+  param([AllowEmptyCollection()][object[]]$Output)
+  try {
+    $payload = ($Output -join "`n") | ConvertFrom-Json -ErrorAction Stop
+    $targets = @($payload.targets)
+    if ($targets.Count -eq 0) { return $false }
+    foreach ($target in $targets) {
+      $r = $target.result
+      # Pending is not successful rendering. Only a plain open can retain this
+      # healthy hidden payload; apply transactions still require visible proof.
+      if ($r.installed -ne $true -or $r.stylePresent -ne $true -or
+          $r.documentHidden -ne $true -or $r.documentVisibility -cne 'hidden' -or
+          -not $r.expectedVersion -or $r.version -cne $r.expectedVersion -or
+          -not $r.expectedRevision -or $r.revision -cne $r.expectedRevision -or
+          -not $r.expectedThemeId -or $r.themeId -cne $r.expectedThemeId -or
+          $r.businessClassPollution -ne 0 -or
+          $r.readiness.structurePass -ne $true -or $r.readiness.viewportPass -ne $true) { return $false }
+    }
+    return $true
+  } catch { return $false }
+}
+
 function Test-DreamSkinRenderedVerificationOutput {
   param([AllowEmptyCollection()][object[]]$Output)
   try {
@@ -65,15 +87,24 @@ function Test-DreamSkinRenderedVerificationOutput {
   return $false
 }
 
-$StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'
+$StateRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $ConfigPath = Join-Path $HOME '.codex\config.toml'
 $BackupPath = Join-Path $StateRoot 'config.before-dream-skin.toml'
 $operationLock = $null
 $startFailureCategory = 'internal-start-failure'
+$startupPending = $false
 $appearanceTransaction = $null
 $appearanceRecovery = 'not-needed'
 try {
   $startupTimer = [Diagnostics.Stopwatch]::StartNew()
+  if(Test-DreamSkinExternalSourceMissing -StateRoot $StateRoot){
+    Set-DreamSkinPaused -Paused $true -StateRoot $StateRoot|Out-Null
+    $nativeCodex=Get-DreamSkinCodexInstall
+    $null=Start-DreamSkinCodex -Codex $nativeCodex
+    if($ResultToken){Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken -Outcome success -Category none -AppearanceRecovery restored}
+    Write-Host 'Steam wallpaper is unavailable; opening Codex with its original appearance.'
+    exit 0
+  }
   $operationLock = Enter-DreamSkinOperationLock `
     -TimeoutMilliseconds $OperationLockTimeoutMilliseconds
   Assert-DreamSkinPort -Port $Port
@@ -127,6 +158,7 @@ try {
         Write-DreamSkinUtf8FileAtomically -Path (Join-Path $StateRoot 'verify.log') -Content (($fastVerify.Output -join "`r`n") + "`r`n")
         Write-Host ('Earth background resumed and verified in {0:N2} seconds. Existing services were preserved.' -f $startupTimer.Elapsed.TotalSeconds)
         if($ResultToken){Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken -Outcome success -Category none -AppearanceRecovery retained}
+        Write-DreamSkinRecoveryIntent -StateRoot $StateRoot -State $fastState
         Start-DreamSkinInstanceMonitor -StateRoot $StateRoot
         exit 0
       }
@@ -645,6 +677,11 @@ try {
       Write-DreamSkinUtf8FileAtomically -Path $VerifyPath -Content (($verify.Output -join "`r`n") + "`r`n")
       if ($daemon.HasExited) { throw "The injector exited during startup. See $StderrPath" }
       if ($verify.ExitCode -eq 0) { break }
+      if (-not $ResultToken -and (Test-DreamSkinPendingVerificationOutput -Output $verify.Output)) {
+        $startupPending = $true
+        Write-Host 'Wallpaper prepared in a hidden window; keeping recovery active until the window becomes visible.'
+        break
+      }
       Write-Host ('Verification failed at ' + (Get-Date).ToString('o') + ': ' + ($verify.Output -join "`r`n"))
       # A verify can fail while the theme is demonstrably on screen: the
       # renderer reports the document visible, the viewport sized and the shell
@@ -803,14 +840,23 @@ try {
     throw $startupError
   }
 
+  Write-DreamSkinRecoveryIntent -StateRoot $StateRoot -State $state
   Start-DreamSkinInstanceMonitor -StateRoot $StateRoot
-  Write-Host "Codex Dream Skin is active on verified loopback port $Port."
+  if ($startupPending) { Write-Host 'Wallpaper is waiting for window visibility; rendering has not yet been verified.' }
+  else { Write-Host "Codex Dream Skin is active on verified loopback port $Port." }
   if ($ResultToken) {
     Write-DreamSkinStartResult -StateRoot $StateRoot -Token $ResultToken `
       -Outcome 'success' -Category 'none' -AppearanceRecovery $appearanceRecovery
   }
 } catch {
   $startError = $_
+  # A failed new session must not strand a previously enabled wallpaper.
+  # The monitor only attaches to freshly verified endpoints; it never relaunches Codex.
+  try {
+    if (Read-DreamSkinRecoveryIntent -StateRoot $StateRoot) {
+      Start-DreamSkinInstanceMonitor -StateRoot $StateRoot
+    }
+  } catch { Write-Warning 'Recovery monitor could not be started; the saved recovery intent was retained.' }
   if ($ResultToken) {
     try {
       $reportedCategory = Get-DreamSkinStartFailureCategory `

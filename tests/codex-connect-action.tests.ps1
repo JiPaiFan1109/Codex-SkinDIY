@@ -1,4 +1,5 @@
-﻿$ErrorActionPreference='Stop'
+﻿function Test-DreamSkinExternalSourceMissing {param($StateRoot);return $false}
+$ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot '../scripts/skin-manager.ps1')
 function Assert($Condition,$Message){if(-not $Condition){throw $Message}}
 $managerSource=[IO.File]::ReadAllText((Join-Path $PSScriptRoot '../scripts/skin-manager.ps1'))
@@ -7,6 +8,20 @@ Assert $clickMatch.Success 'Connection icon must have an actual click binding'
 $clickHandler=[scriptblock]::Create($clickMatch.Groups[1].Value.TrimStart('{').TrimEnd('}'))
 # Only the application launch boundary is mocked: these tests must never restart real Codex.
 function Start-DynamicManagerWork {param($Operation);$script:requested=$Operation}
+$startupMatch=[regex]::Match($managerSource,'\$window\.Add_ContentRendered\((\{[^\r\n]*\})\)')
+Assert $startupMatch.Success 'Manager must have a startup binding'
+$startupText=$startupMatch.Groups[1].Value
+$startupHandler=[scriptblock]::Create($startupText.Substring(1,$startupText.Length-2))
+$script:SkinManager=@{Busy=$false;PrepareOnly=$false;Async=$null}
+$script:requested=$null
+& $startupHandler
+Assert ($script:requested -eq 'Open') 'Normal startup must connect automatically instead of only detecting'
+$script:requested=$null
+& $startupHandler
+Assert ($null -eq $script:requested) 'Repeated ContentRendered events must not reconnect after completion or cancellation'
+$script:SkinManager=@{Busy=$false;PrepareOnly=$true;Async=$null}
+& $startupHandler
+Assert ($script:requested -eq 'Refresh') 'Preview startup must remain read-only'
 $script:SkinManager=@{Busy=$false;PrepareOnly=$false;Connection=[pscustomobject]@{Available=$true;Connected=$false}}
 $script:requested=$null
 & $clickHandler

@@ -55,9 +55,9 @@ try {
   if (-not $nestedRejected -or (Test-Path $nestedRoot)) { throw 'Nested source install must be rejected before creating files.' }
   $customRejected = $false
   try { Install-DynamicSkin -SourceRoot $repo -InstallRoot "$temp/custom" -DesktopPath ([Environment]::GetFolderPath('Desktop')) -NodeRuntimePath "$temp/fake.exe" } catch {
-    $customRejected = $_.Exception.Message -like 'Custom installation roots*'
+    $customRejected = $_.Exception.Message -notlike 'Custom installation roots*'
   }
-  if (-not $customRejected -or (Test-Path "$temp/custom")) { throw 'Custom root must be rejected before touching the real desktop or validating runtime.' }
+  if (-not $customRejected -or (Test-Path "$temp/custom/engine")) { throw 'Custom root must validate safely before creating the engine.' }
   'PASS install isolation, backup, shortcuts, rejected runtime'
 } finally {
   if ([IO.Path]::GetFullPath($temp).StartsWith([IO.Path]::GetTempPath(), [StringComparison]::OrdinalIgnoreCase)) { Remove-Item -LiteralPath $temp -Recurse -Force }

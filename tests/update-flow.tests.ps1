@@ -3,7 +3,7 @@ $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $repo 'scripts/app-update.ps1')
 function Assert($Condition,$Message){if(-not $Condition){throw $Message}}
 function Reject([scriptblock]$Action){$rejected=$false;try{& $Action|Out-Null}catch{$rejected=$true};Assert $rejected 'Unsafe operation was accepted'}
-$root=Join-Path ([IO.Path]::GetTempPath()) ('update-flow-'+[guid]::NewGuid().ToString('N'))
+$root=Join-Path ([IO.Path]::GetTempPath()) ('update-flow 中文 路径-'+[guid]::NewGuid().ToString('N'))
 New-Item (Join-Path $root 'scripts') -ItemType Directory -Force|Out-Null
 $rsa=New-Object Security.Cryptography.RSACryptoServiceProvider 2048;$rsa.PersistKeyInCsp=$false
 try{
@@ -57,8 +57,9 @@ try{
   Assert ($installMessages.Count -ge 3 -and $installMessages[-1] -eq '正在确认安装结果…') 'Installer did not report its actual stages'
   Assert ((Get-Content (Join-Path $root 'VERSION')) -eq '0.4.0') 'Installer was not run'
   Assert ((Get-Content (Join-Path $root 'wallpaper.txt')) -eq 'keep') 'Updater changed user files'
-  $arguments=Get-Content (Join-Path $root 'args.txt')
+  $arguments=Get-Content (Join-Path $root 'args.txt') -Encoding UTF8
   Assert ($arguments -contains '/NORESTART' -and $arguments -contains '/VERYSILENT') 'Updater lost silent or no-reboot flags'
   Reject {Invoke-DynamicUpdateInstall $root $stage '0.4.0' 0}
+  Assert ($arguments -contains ('/DIR='+$root)) 'Updater must target the current custom installation directory'
   'PASS detached installer success, failure, duplicate protection and user data preservation'
 }finally{$rsa.Dispose();Remove-Item -LiteralPath $root -Recurse -Force}

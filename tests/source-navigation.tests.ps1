@@ -16,7 +16,7 @@ try{
  Assert (@(Get-DynamicVisibleWallpapers $items All Local).Count -eq 0) 'Engine item leaked into manual library'
  Assert (@(Get-DynamicVisibleWallpapers $items Image WallpaperEngine).Count -eq 1) 'Engine item missing in engine tab'
  $manual=Import-DynamicWallpaper "$project/art.png" Image $state
- Assert $manual.AlreadyExists 'Cross-source content duplicated on disk'
+ Assert (-not $manual.AlreadyExists -and -not $manual.Item.External -and $manual.Item.MediaPath -ne $items[0].MediaPath) 'Local import must own a separate copy from the Steam reference'
  $items=@(Get-DynamicWallpaperItems $state)
  Assert (@(Get-DynamicVisibleWallpapers $items All Local).Count -eq 1 -and @(Get-DynamicVisibleWallpapers $items All WallpaperEngine).Count -eq 1) 'Explicit manual import did not retain both memberships'
  $single=Import-DynamicWallpaperEngine -Roots @($project) -StateRoot $state

@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([string]$StateRoot=(Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'))
+param([string]$StateRoot=(Split-Path (Split-Path $PSScriptRoot -Parent) -Parent))
 
 function Start-DreamSkinInstanceMonitor {
   param([string]$StateRoot)
@@ -81,6 +81,7 @@ function Invoke-DreamSkinInstanceMonitor {
       try{
         try{$operation=Enter-DreamSkinOperationLock}catch{Start-Sleep -Seconds 2;continue}
         $state=Read-DreamSkinState -Path (Join-Path $StateRoot 'state.json')
+        if(-not $state){$state=Read-DreamSkinRecoveryIntent -StateRoot $StateRoot}
         if(-not $state){
           foreach($key in @($workers.Keys)){Stop-DreamSkinInstanceWorker $workers[$key] -Remove;$workers.Remove($key)}
           $lastState=$null
@@ -89,7 +90,9 @@ function Invoke-DreamSkinInstanceMonitor {
           Write-DreamSkinInstanceStatus $status $workers $StateRoot
         }else{
           # All instances follow the same committed theme; a new apply restarts children with new video metadata.
-          $revision=([IO.File]::ReadAllText((Join-Path $StateRoot 'state.json')))
+          $revisionPath=Join-Path $StateRoot 'state.json'
+          if(-not (Test-Path -LiteralPath $revisionPath)){$revisionPath=Join-Path $StateRoot 'recovery-intent.json'}
+          $revision=[IO.File]::ReadAllText($revisionPath)
           if($lastState -and $revision -cne $lastState){
             foreach($key in @($workers.Keys)){Stop-DreamSkinInstanceWorker $workers[$key];$workers.Remove($key)}
             $videoRetryAt=[datetime]::MinValue
@@ -116,6 +119,7 @@ function Invoke-DreamSkinInstanceMonitor {
               $null=Stop-DreamSkinRecordedInjector -State $state
               $state.videoPid=$recovered.Process.Id;$state.videoStartedAt=$recovered.StartedAt
               Write-DreamSkinState -Path (Join-Path $StateRoot 'state.json') -State $state
+              Write-DreamSkinRecoveryIntent -StateRoot $StateRoot -State $state
               $lastState=[IO.File]::ReadAllText((Join-Path $StateRoot 'state.json'))
               $videoAvailable=$true
               } catch {
@@ -153,7 +157,8 @@ function Invoke-DreamSkinInstanceMonitor {
           }
           $registeredProcesses=@($processes|Where-Object {$candidate=$_;@($installs|Where-Object {Test-DreamSkinPathEqual $_.Executable $candidate.ExecutablePath}).Count -gt 0})
           $unavailable=@(Get-DreamSkinCodexMainProcesses $registeredProcesses|Where-Object {$_.CommandLine -notmatch '--remote-debugging-port(?:=|\s+)\d+'}|ForEach-Object {$_.ProcessId})
-          $status=[pscustomobject]@{UpdatedAt=[datetime]::UtcNow.ToString('o');Enabled=$true;VideoFallback=[bool]($state.videoPid -and -not $videoAvailable);VerifiedConnections=$endpoints.Count;AdditionalWatchers=$workers.Count;Ports=@($endpoints|ForEach-Object {$_.Port});ProcessesWithoutConnection=$unavailable}
+          $recoveryState=if($unavailable.Count -gt 0){'connection-required'}elseif($endpoints.Count -eq 0){'waiting-for-codex'}else{'monitoring'}
+          $status=[pscustomobject]@{UpdatedAt=[datetime]::UtcNow.ToString('o');Enabled=$true;RecoveryState=$recoveryState;VideoFallback=[bool]($state.videoPid -and -not $videoAvailable);VerifiedConnections=$endpoints.Count;AdditionalWatchers=$workers.Count;Ports=@($endpoints|ForEach-Object {$_.Port});ProcessesWithoutConnection=$unavailable}
           Write-DreamSkinInstanceStatus $status $workers $StateRoot
           $lastError=$null
         }

@@ -21,8 +21,8 @@ DefaultDirName={#TestInstallRoot}
 #else
 DefaultDirName={localappdata}\CodexDynamicSkin
 #endif
-UsePreviousAppDir=no
-DisableDirPage=yes
+UsePreviousAppDir=yes
+DisableDirPage=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
@@ -104,22 +104,6 @@ begin
       Result := UTF8Decode(BlockReason)
     else
       Result := '无法完成后台检查，本次安装未替换文件。请退出相关程序后重试。';
-  end;
-end;
-
-function InitializeSetup: Boolean;
-var
-  ExpectedDirectory: String;
-begin
-  Result := True;
-#ifdef TestInstallRoot
-  ExpectedDirectory := '{#TestInstallRoot}';
-#else
-  ExpectedDirectory := ExpandConstant('{localappdata}\CodexDynamicSkin');
-#endif
-  if CompareText(ExpandConstant('{param:DIR|' + ExpectedDirectory + '}'), ExpectedDirectory) <> 0 then begin
-    if not WizardSilent then MsgBox('安装位置固定为当前用户目录，以便自动连接 Codex。', mbError, MB_OK);
-    Result := False;
   end;
 end;
 

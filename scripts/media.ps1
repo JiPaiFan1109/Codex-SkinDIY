@@ -172,7 +172,11 @@ function Invoke-DynamicBackgroundTransaction {
       $theme=[pscustomobject]@{schemaVersion=1;id='custom';name='本地背景';appearance='auto';imageOpacity=$opacity;imageShade=1}
       if($null -ne $Prepared.ImageShade){$theme.imageShade=[Math]::Max(0.0,[Math]::Min(1.0,[double]$Prepared.ImageShade))}
     }
-    $null = Set-DreamSkinActiveTheme -ImagePath $Prepared.Preview -Theme $theme -Name '本地背景' -StateRoot $root
+    if($Prepared.External){
+      if(-not $theme){$theme=[pscustomobject]@{schemaVersion=1;id='custom';name='Steam 壁纸';appearance='auto'}}
+      $theme|Add-Member -NotePropertyName externalSource -NotePropertyValue ([pscustomobject]@{kind=$Prepared.Kind;path=$Prepared.Path;size=$Prepared.Size;sha256=$Prepared.Sha256}) -Force
+    }
+    $null = Set-DreamSkinActiveTheme -ImagePath $Prepared.Preview -Theme $theme -Name '本地背景' -StateRoot $root -ReferenceImage:($Prepared.External -and $Prepared.Kind -eq 'Image')
     if ($Prepared.Kind -eq 'Video') {
       Write-DreamSkinUtf8FileAtomically -Path $video -Content (([ordered]@{schema='codex-dream-skin-video/1'; filePath=$Prepared.Path; expectedSize=$Prepared.Size; expectedSha256=$Prepared.Sha256} | ConvertTo-Json -Compress))
     } else { Remove-Item -LiteralPath $video -Force -ErrorAction SilentlyContinue }
@@ -206,8 +210,8 @@ function Invoke-DynamicBackgroundTransaction {
 
 function Invoke-DynamicEngine {
   param([switch]$Restore, [string]$StateRoot)
-  $expected = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'))
-  if ([IO.Path]::GetFullPath($StateRoot).TrimEnd('\') -ine $expected.TrimEnd('\') -or $script:DynamicInstallRoot.TrimEnd('\') -ine $expected.TrimEnd('\')) { throw '自定义 InstallRoot 或 StateRoot 仅支持 PrepareOnly，不能启动或恢复真实应用。' }
+  $expected = [IO.Path]::GetFullPath($script:DynamicInstallRoot)
+  if ([IO.Path]::GetFullPath($StateRoot).TrimEnd('\') -ine $expected.TrimEnd('\')) { throw '真实操作必须使用当前安装目录及其状态目录。' }
   $name = 'start-dream-skin.ps1'; if ($Restore) { $name = 'restore-dream-skin.ps1' }
   $arguments = @('-NoProfile','-ExecutionPolicy','RemoteSigned','-File',(ConvertTo-DreamSkinProcessArgument (Join-Path $script:DynamicInstallRoot ('engine/scripts/' + $name))))
   $token = [guid]::NewGuid().ToString('N')

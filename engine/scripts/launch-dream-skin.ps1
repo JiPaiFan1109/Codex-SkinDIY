@@ -97,6 +97,8 @@ function Invoke-DynamicQuickLauncher {
   $engineRoot=Split-Path $ScriptRoot -Parent
   $stateRoot=Split-Path $engineRoot -Parent
   try{
+    . (Join-Path $ScriptRoot 'theme-windows.ps1')
+    if(Test-DreamSkinExternalSourceMissing -StateRoot $stateRoot){throw 'Steam source unavailable; use native appearance startup'}
     $statePath=Join-Path $stateRoot 'state.json'
     $info=Get-Item -LiteralPath $statePath -ErrorAction Stop
     if($info.Length-lt2 -or $info.Length-gt65536){throw 'Invalid state size'}

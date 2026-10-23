@@ -500,9 +500,11 @@ export async function loadTheme(themeDir) {
   }
   const image = normalizedText(raw.image, "image", null, 240);
   if (!image || path.isAbsolute(image)) throw new Error("Theme image must be a relative path");
-  const imagePath = path.resolve(realThemeDir, image);
+  const external = raw.externalSource?.kind === 'Image' ? raw.externalSource : null;
+  if (external && (image !== 'external-image' || !path.isAbsolute(external.path ?? '') || !/^[a-f0-9]{64}$/.test(external.sha256 ?? ''))) throw new Error('Invalid external image identity');
+  const imagePath = external ? path.resolve(external.path) : path.resolve(realThemeDir, image);
   const relativeImage = path.relative(realThemeDir, imagePath);
-  if (!isContainedRelativePath(relativeImage)) {
+  if (!external && !isContainedRelativePath(relativeImage)) {
     throw new Error("Theme image must remain inside the selected theme directory");
   }
   const extension = path.extname(imagePath).toLowerCase();
@@ -511,7 +513,7 @@ export async function loadTheme(themeDir) {
   }
   const realImagePath = await fs.realpath(imagePath);
   const realRelativeImage = path.relative(realThemeDir, realImagePath);
-  if (!isContainedRelativePath(realRelativeImage)) {
+  if ((!external && !isContainedRelativePath(realRelativeImage)) || (external && path.resolve(realImagePath).toLowerCase() !== imagePath.toLowerCase())) {
     throw new Error("Theme image cannot escape through a link or junction");
   }
   const theme = {
@@ -542,6 +544,7 @@ export async function loadTheme(themeDir) {
     throw new Error(`Theme image exceeds the ${MAX_ART_BYTES / 1024 / 1024} MB limit`);
   }
   const imageBytes = await fs.readFile(realImagePath);
+  if (external && (imageBytes.length !== external.size || createHash('sha256').update(imageBytes).digest('hex') !== external.sha256)) throw new Error('External image changed');
   if (imageBytes.length < 1 || imageBytes.length > MAX_ART_BYTES) {
     throw new Error(`Theme image must be between 1 byte and ${MAX_ART_BYTES / 1024 / 1024} MB`);
   }
@@ -561,6 +564,7 @@ export async function loadTheme(themeDir) {
     theme,
     themePath,
     imagePath: realImagePath,
+    externalSource: raw.externalSource ?? null,
     imageBytes,
     safeCss: safeCss?.source ?? "",
     safeCssRuntime: safeCss?.runtimeSource ?? "",
@@ -645,6 +649,7 @@ export async function loadPayload(
   loadedTheme.theme.artKey = createHash("sha256")
     .update(loadedTheme.imageBytes).digest("hex").slice(0, 20);
   const normalizedVideo = normalizeVideoPayloadConfig(videoConfig);
+  if (normalizedVideo && loadedTheme.externalSource) normalizedVideo.persistentCache = false;
   const payloadTheme = normalizedVideo
     ? { ...loadedTheme.theme, video: normalizedVideo }
     : loadedTheme.theme;
@@ -1538,6 +1543,20 @@ async function runOneShot(options) {
   if (failed) process.exitCode = 2;
 }
 
+export async function externalSourceUnavailable(themeDir) {
+  let source;
+  try {
+    const raw = JSON.parse(await fs.readFile(path.join(themeDir, 'theme.json'), 'utf8'));
+    source = raw.externalSource;
+  } catch { return false; }
+  if (!source) return false;
+  try {
+    if (!path.isAbsolute(source.path ?? '') || !['Image', 'Video'].includes(source.kind)) return true;
+    const stat = await fs.stat(source.path);
+    return !stat.isFile() || stat.size !== source.size;
+  } catch { return true; }
+}
+
 async function runWatch(options) {
   const identityAnchor = await connectBrowserIdentityAnchor(options.port, options.browserId, options.timeoutMs);
   const sessions = new Map();
@@ -1552,7 +1571,7 @@ async function runWatch(options) {
   let lastStrongThemeAuditAt = 0;
   let lastSessionAuditAt = 0;
   let loadedPayload = null;
-  const videoConfig = options.videoState ? await loadVideoReadiness(options.videoState) : null;
+  const videoConfig = options.videoState && !await externalSourceUnavailable(options.themeDir) ? await loadVideoReadiness(options.videoState) : null;
   let paused = false;
   const stop = () => { stopping = true; };
   const rejectTarget = (target, baseDelayMs, error = null) => {
@@ -1587,9 +1606,10 @@ async function runWatch(options) {
   process.on("SIGTERM", stop);
 
   try {
-    loadedPayload = await loadPayload(options.themeDir, null, videoConfig);
+    const missingAtStart = await externalSourceUnavailable(options.themeDir);
+    loadedPayload = await loadPayload(missingAtStart ? path.join(root, 'assets') : options.themeDir, null, missingAtStart ? null : videoConfig);
     lastStrongThemeAuditAt = Date.now();
-    paused = await fileExists(options.pauseFile);
+    paused = missingAtStart || await fileExists(options.pauseFile);
     while (!stopping) {
       if (identityAnchor.closed) {
         console.error("[dream-skin] original CDP browser identity closed; watcher is stopping instead of reconnecting");
@@ -1611,7 +1631,7 @@ async function runWatch(options) {
         continue;
       }
 
-      const nextPaused = await fileExists(options.pauseFile);
+      const nextPaused = await fileExists(options.pauseFile) || await externalSourceUnavailable(options.themeDir);
       let nextPayload = loadedPayload;
       if (!nextPaused) {
         try {

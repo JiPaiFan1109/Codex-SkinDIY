@@ -19,7 +19,7 @@ function sessionFixture() {
     revokeObjectURL(url) { revoked.push(url); },
   } });
   const session = { async evaluate(expression) { return vm.runInContext(expression, context); } };
-  return { state, window, session, revoked, blobs, attached };
+  return { state, window, session, revoked, blobs, attached, context };
 }
 function mockFetch(t, bytes, check = () => {}) {
   let calls = 0;
@@ -49,6 +49,22 @@ test('rejects SHA mismatch without attaching media', async t => {
   mockFetch(t, bytes); const f = sessionFixture();
   await assert.rejects(installVideoBlob(f.session, config), /SHA|hash/i);
   assert.equal(f.blobs.length, 0); assert.equal(f.state.videoUpload, undefined);
+});
+
+test('Steam reference playback never opens the persistent video cache', async t => {
+  const { bytes, config } = fixture(); config.persistentCache = false;
+  mockFetch(t, bytes);
+  const f = sessionFixture();
+  let cacheReads = 0;
+  Object.defineProperty(f.context, 'caches', {get(){cacheReads++; throw Error('Persistent cache is forbidden');}});
+  const original = f.session.evaluate;
+  f.session.evaluate = async expression => {
+    assert.ok(!expression.startsWith('(async function restoreVideoCache'), 'must not attempt cache restore');
+    return original(expression);
+  };
+  await installVideoBlob(f.session, config);
+  assert.equal(f.attached.length, 1);
+  assert.equal(cacheReads, 0);
 });
 
 test('concurrent windows share one verified download and attach independently', async t => {

@@ -556,7 +556,7 @@ function Get-DreamSkinCodexInstall {
   $discoveryError=$null
   try { $installs = @(Get-DreamSkinRegisteredCodexInstalls) } catch { $discoveryError=$_.Exception.Message }
   if ($installs.Count -eq 0) {
-    $manualPath = Join-Path (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin') 'codex-manual.json'
+    $manualPath = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'codex-manual.json'
     if (Test-Path -LiteralPath $manualPath -PathType Leaf) {
       try {
         $manual = Read-DreamSkinUtf8File -Path $manualPath | ConvertFrom-Json -ErrorAction Stop
@@ -1173,6 +1173,25 @@ function Write-DreamSkinState {
   param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][object]$State)
   $json = $State | ConvertTo-Json -Depth 6
   Write-DreamSkinUtf8FileAtomically -Path $Path -Content ($json + "`r`n")
+}
+
+function Write-DreamSkinRecoveryIntent {
+  param([string]$StateRoot,[object]$State)
+  # A durable opt-in and recovery hint, never proof of a live process/endpoint.
+  Write-DreamSkinState -Path (Join-Path $StateRoot 'recovery-intent.json') -State $State
+}
+
+function Read-DreamSkinRecoveryIntent {
+  param([string]$StateRoot)
+  $path=Join-Path $StateRoot 'recovery-intent.json'
+  if(-not (Test-Path -LiteralPath $path)){return $null}
+  return Read-DreamSkinState -Path $path
+}
+
+function Clear-DreamSkinRecoveryIntent {
+  param([string]$StateRoot)
+  $path=Join-Path $StateRoot 'recovery-intent.json'
+  if(Test-Path -LiteralPath $path){Remove-Item -LiteralPath $path -Force -ErrorAction Stop}
 }
 
 function Archive-DreamSkinStateFile {
