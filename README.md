@@ -1,8 +1,6 @@
 ﻿<p align="center">
   <img src="appearance/codexpage-wordmark.png" width="480" alt="CodexPage">
 </p>
-<h1 align="center">CodexPage</h1>
-<p align="center">Codex壁纸 · CodexDIY · Codex背景</p>
 <p align="center">为你的 Codex 换上喜欢的图片或动态背景。导入、预览、切换，在一个窗口里完成。</p>
 <p align="center">
   <a href="https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download/Codex-Skin-Manager-Setup.exe"><strong>下载 Windows 安装版</strong></a>
@@ -15,8 +13,6 @@
 </p>
 
 本项目是社区开发的独立工具，**非 OpenAI 官方产品，与 OpenAI 无隶属关系**。使用前请安装官方 Microsoft Store 版 Codex。
-
-> 项目现名为 **CodexPage**。现有公开安装包可能仍显示旧名称；安装目录、壁纸库和下载文件名保持兼容。
 
 ## 界面与功能
 
