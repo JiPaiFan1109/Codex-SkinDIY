@@ -102,11 +102,11 @@ function Complete-DynamicUpdateWork {
       try{
         $deadline=[datetime]::UtcNow.AddSeconds(15)
         while(-not(Test-Path -LiteralPath $ready)){
-          if($helperProcess.HasExited -or [datetime]::UtcNow -gt $deadline){throw '安装窗口未能启动，管理中心已保留，请重试。'}
+          if($helperProcess.HasExited -or [datetime]::UtcNow -gt $deadline){throw '安装窗口未能启动，CodexPage 已保留，请重试。'}
           $ui.Window.Dispatcher.Invoke([action]{},[Windows.Threading.DispatcherPriority]::Background)
           Start-Sleep -Milliseconds 50
         }
-        if($helperProcess.HasExited){throw '安装窗口已退出，管理中心已保留，请重试。'}
+        if($helperProcess.HasExited){throw '安装窗口已退出，CodexPage 已保留，请重试。'}
       }catch{
         # Before handoff this process can only be waiting for this manager.
         # Stop our own helper so a late startup cannot race a subsequent retry.

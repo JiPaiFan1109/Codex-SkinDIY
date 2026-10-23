@@ -11,11 +11,11 @@ AppId={{0E7720A7-D16D-4441-85E5-522908601905}
 #else
 AppId={{97EC4AF8-3971-4B65-A78E-16B0D870C41D}
 #endif
-AppName=Codex 换肤管理中心
+AppName=CodexPage
 AppVersion={#AppVersion}
-AppPublisher=Codex Dynamic Skin contributors
-AppPublisherURL=https://github.com/JiPaiFan1109/Codex-SkinDIY
-AppSupportURL=https://github.com/JiPaiFan1109/Codex-SkinDIY/issues
+AppPublisher=CodexPage contributors
+AppPublisherURL=https://github.com/JiPaiFan1109/CodexPage
+AppSupportURL=https://github.com/JiPaiFan1109/CodexPage/issues
 #ifdef TestInstallRoot
 DefaultDirName={#TestInstallRoot}
 #else
@@ -58,6 +58,13 @@ Source: "{#SourceRoot}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceRoot}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [InstallDelete]
+#ifndef TestInstallRoot
+Type: files; Name: "{userdesktop}\Codex 换肤管理中心.lnk"
+Type: files; Name: "{userprograms}\Codex 换肤管理中心\Codex 换肤管理中心.lnk"
+Type: files; Name: "{userprograms}\Codex 换肤管理中心\打开换肤版 Codex.lnk"
+Type: files; Name: "{userprograms}\Codex 换肤管理中心\卸载.lnk"
+Type: dirifempty; Name: "{userprograms}\Codex 换肤管理中心"
+#endif
 Type: files; Name: "{app}\engine\assets\dream-skin.css"
 Type: files; Name: "{app}\engine\assets\theme-package-validator.mjs"
 Type: files; Name: "{app}\engine\assets\dream-reference.jpg"
@@ -69,15 +76,15 @@ Type: files; Name: "{app}\engine\scripts\verify-dream-skin.ps1"
 
 [Icons]
 #ifndef TestInstallRoot
-Name: "{userprograms}\Codex 换肤管理中心\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"; AppUserModelID: "CodexDynamicSkin.Manager"
-Name: "{userprograms}\Codex 换肤管理中心\打开换肤版 Codex"; Filename: "{app}\engine\launcher\CodexDynamicSkinLauncher.exe"; IconFilename: "{app}\CodexSkinManager.exe"
-Name: "{userprograms}\Codex 换肤管理中心\卸载"; Filename: "{uninstallexe}"
-Name: "{userdesktop}\Codex 换肤管理中心"; Filename: "{app}\CodexSkinManager.exe"; AppUserModelID: "CodexDynamicSkin.Manager"; Tasks: desktopicon
+Name: "{userprograms}\CodexPage\CodexPage"; Filename: "{app}\CodexSkinManager.exe"; AppUserModelID: "CodexDynamicSkin.Manager"
+Name: "{userprograms}\CodexPage\打开换肤版 Codex"; Filename: "{app}\engine\launcher\CodexDynamicSkinLauncher.exe"; IconFilename: "{app}\CodexSkinManager.exe"
+Name: "{userprograms}\CodexPage\卸载"; Filename: "{uninstallexe}"
+Name: "{userdesktop}\CodexPage"; Filename: "{app}\CodexSkinManager.exe"; AppUserModelID: "CodexDynamicSkin.Manager"; Tasks: desktopicon
 #endif
 
 [Run]
 #ifndef TestInstallRoot
-Filename: "{app}\CodexSkinManager.exe"; Description: "打开 Codex 换肤管理中心"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\CodexSkinManager.exe"; Description: "打开 CodexPage"; Flags: nowait postinstall skipifsilent
 #endif
 
 [Code]
@@ -129,5 +136,5 @@ begin
     RaiseException('无法启动外观恢复，卸载已停止，应用和壁纸库均保留。');
   if ExitCode = 2 then Abort;
   if ExitCode <> 0 then
-    RaiseException('外观恢复未完成，卸载已停止。请先在换肤管理中心恢复原始外观后重试。');
+    RaiseException('外观恢复未完成，卸载已停止。请先在 CodexPage 恢复原始外观后重试。');
 end;

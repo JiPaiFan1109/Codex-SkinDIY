@@ -1,4 +1,4 @@
-# Windows 使用体验自查与修复
+﻿# Windows 使用体验自查与修复
 
 日期：2026-10-13。审查基线：公开 v0.2.0，提交 `6ae6bc13807e9405b14e81333af84674292200cd`。修复版本：0.2.1。
 
@@ -29,8 +29,8 @@
 
 - 首次安装识别 Codex、静态/动态切换、真正的外观恢复及不同 Codex 版本兼容性。
 - 视频解码依赖 Windows 媒体组件；隔离检查不能证明所有用户视频都能播放。
-- 长视频导入仍无取消功能，第二次启动管理中心仍采用已打开提示；这两项保留为后续体验改进，不通过强制结束进程处理。
+- 长视频导入仍无取消功能，第二次启动 CodexPage 仍采用已打开提示；这两项保留为后续体验改进，不通过强制结束进程处理。
 
 同学测试前先保存 Codex 工作，使用最新版下载链接。遇到问题记录操作顺序、完整提示截图、Codex 版本及收藏是否保留。
 
-验证记录位于 [Windows UX regression review](https://github.com/JiPaiFan1109/Codex-SkinDIY/actions/workflows/verify-windows.yml)，源码改动位于 [修复 PR](https://github.com/JiPaiFan1109/Codex-SkinDIY/pull/1)。
+验证记录位于 [Windows UX regression review](https://github.com/JiPaiFan1109/CodexPage/actions/workflows/verify-windows.yml)，源码改动位于 [修复 PR](https://github.com/JiPaiFan1109/CodexPage/pull/1)。

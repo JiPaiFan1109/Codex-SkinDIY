@@ -5,6 +5,8 @@ $root=Join-Path ([IO.Path]::GetTempPath()) ('update-stage-test-'+[guid]::NewGuid
 $stage=$null;$rsa=[Security.Cryptography.RSACryptoServiceProvider]::new(2048);$rsa.PersistKeyInCsp=$false
 try{
   [IO.Directory]::CreateDirectory((Join-Path $root 'scripts'))|Out-Null
+  [IO.Directory]::CreateDirectory((Join-Path $root 'appearance'))|Out-Null
+  Copy-Item (Join-Path $repo 'appearance/codexpage-wordmark.png') (Join-Path $root 'appearance')
   [IO.File]::WriteAllText((Join-Path $root 'VERSION'),'1.0.1')
   foreach($name in @('app-update.ps1','finish-update.ps1','update-progress.ps1','update-progress.xaml')){Copy-Item (Join-Path $repo ('scripts/'+$name)) (Join-Path $root 'scripts')}
   [IO.File]::WriteAllText((Join-Path $root 'scripts/update-public-key.xml'),$rsa.ToXmlString($false))
@@ -26,6 +28,7 @@ try{
     if(-not(Test-Path (Join-Path $stage $name))){throw ('Staged helper dependency missing: '+$name)}
   }
   if($messages[-1] -ne '正在校验更新包…'){throw 'Verification stage must follow download completion'}
+  if((Get-FileHash (Join-Path $stage 'codexpage-wordmark.png')).Hash -ne (Get-FileHash (Join-Path $root 'appearance/codexpage-wordmark.png')).Hash){throw 'Detached update window lost its wordmark'}
   if([IO.File]::ReadAllText((Join-Path $root 'VERSION')) -ne '1.0.1'){throw 'Download changed the running install'}
   'PASS signed staging, complete detached helper dependencies and verification progress'
 }finally{

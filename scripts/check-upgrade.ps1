@@ -10,8 +10,8 @@ function Get-DynamicUpgradeBlockReason {
     $processes=@(Get-CimInstance Win32_Process -Filter "Name='node.exe' OR Name='powershell.exe' OR Name='CodexSkinManager.exe'")
     foreach($process in $processes){
       if([string]$process.ExecutablePath -ieq $runtime){return '安装运行环境仍被使用，请关闭相关程序后重试；无法确认归属的进程不会被自动终止。'}
-      if([string]$process.ExecutablePath -ieq (Join-Path $root 'CodexSkinManager.exe')){return '请先关闭换肤管理中心，再重试安装。'}
-      if($process.CommandLine -and ([string]$process.CommandLine).IndexOf(($root+'\scripts\manage-background.ps1'),[StringComparison]::OrdinalIgnoreCase) -ge 0){return '请先关闭换肤管理中心，再重试安装。'}
+      if([string]$process.ExecutablePath -ieq (Join-Path $root 'CodexSkinManager.exe')){return '请先关闭 CodexPage，再重试安装。'}
+      if($process.CommandLine -and ([string]$process.CommandLine).IndexOf(($root+'\scripts\manage-background.ps1'),[StringComparison]::OrdinalIgnoreCase) -ge 0){return '请先关闭 CodexPage，再重试安装。'}
     }
   }catch{return '无法检查换肤后台是否已经退出，本次安装不会替换文件。请稍后重试。'}
   return $null
@@ -25,8 +25,8 @@ function Invoke-DynamicUpgradePreparation {
   try {
     $processes=@(Get-CimInstance Win32_Process -Filter "Name='node.exe' OR Name='powershell.exe' OR Name='CodexSkinManager.exe'" -ErrorAction Stop)
     foreach($process in $processes){
-      if([string]$process.ExecutablePath -ieq (Join-Path $root 'CodexSkinManager.exe')){return '请先关闭换肤管理中心，再重试安装。'}
-      if($process.CommandLine -and ([string]$process.CommandLine).IndexOf(($root+'\scripts\manage-background.ps1'),[StringComparison]::OrdinalIgnoreCase) -ge 0){return '请先关闭换肤管理中心，再重试安装。'}
+      if([string]$process.ExecutablePath -ieq (Join-Path $root 'CodexSkinManager.exe')){return '请先关闭 CodexPage，再重试安装。'}
+      if($process.CommandLine -and ([string]$process.CommandLine).IndexOf(($root+'\scripts\manage-background.ps1'),[StringComparison]::OrdinalIgnoreCase) -ge 0){return '请先关闭 CodexPage，再重试安装。'}
     }
     $nodes=@($processes|Where-Object {[string]$_.ExecutablePath -ieq $runtime})
     $blocked='仍有无法验证身份的进程占用安装运行环境，请退出相关程序或重启后再安装。未修改安装文件。'

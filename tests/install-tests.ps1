@@ -15,14 +15,14 @@ try {
   try { Install-DynamicSkin -SourceRoot $repo -InstallRoot $rollbackRoot -DesktopPath "$temp/blocked-desktop" -NodeRuntimePath $NodeRuntimePath } catch { $failed = $true }
   if (-not $failed -or -not (Test-Path "$rollbackRoot/engine/old.txt")) { throw 'Shortcut failure did not roll back the old engine.' }
   $partialDesktop = New-Item "$temp/partial-desktop" -ItemType Directory
-  Set-Content "$partialDesktop/Codex Background Manager.lnk" 'original manager shortcut'
-  $locked = [IO.File]::Open("$partialDesktop/Codex Background Manager.lnk", 'Open', 'ReadWrite', 'None')
+  Set-Content "$partialDesktop/CodexPage.lnk" 'original manager shortcut'
+  $locked = [IO.File]::Open("$partialDesktop/CodexPage.lnk", 'Open', 'ReadWrite', 'None')
   $failed = $false
   try {
     try { Install-DynamicSkin -SourceRoot $repo -InstallRoot $rollbackRoot -DesktopPath $partialDesktop -NodeRuntimePath $NodeRuntimePath } catch { $failed = $true }
   } finally { $locked.Dispose() }
   if (-not $failed -or -not (Test-Path "$rollbackRoot/engine/old.txt") -or (Test-Path "$partialDesktop/Codex.lnk")) { throw 'Partial shortcut failure did not restore engine and remove the newly created shortcut.' }
-  if ((Get-Content "$partialDesktop/Codex Background Manager.lnk" -Raw).Trim() -ne 'original manager shortcut') { throw 'Failed shortcut transaction overwrote original shortcut.' }
+  if ((Get-Content "$partialDesktop/CodexPage.lnk" -Raw).Trim() -ne 'original manager shortcut') { throw 'Failed shortcut transaction overwrote original shortcut.' }
   $desktop = New-Item "$temp/Desktop" -ItemType Directory
   Set-Content "$desktop/Codex.lnk" 'original shortcut'
   $root = "$temp/installed"
@@ -40,7 +40,7 @@ try {
   if (Test-Path "$desktop/Codex Dynamic Skin.lnk") { throw 'Installer left a second normal Codex entry on the desktop.' }
   if (-not (Test-Path -LiteralPath $link.TargetPath -PathType Leaf)) { throw 'Compiled fast launcher is missing.' }
   if ($link.IconLocation -notlike '*icons\chatgpt-app-light.ico*' -or -not (Test-Path "$root/icons/chatgpt-app-light.ico")) { throw 'Installed shortcut did not receive the locally registered official icon.' }
-  $managerLink=$shell.CreateShortcut("$desktop/Codex Background Manager.lnk")
+  $managerLink=$shell.CreateShortcut("$desktop/CodexPage.lnk")
   if($managerLink.IconLocation -notlike '*appearance\skin-manager.ico*'){throw 'Manager upgrade ignored the user custom icon'}
   if (-not (Get-ChildItem "$root/backups" -Recurse -Filter Codex.lnk)) { throw 'Existing Codex shortcut was not backed up.' }
   if (-not (Test-Path "$root/private.txt")) { throw 'Private state deleted.' }

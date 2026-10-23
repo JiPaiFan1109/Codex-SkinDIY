@@ -1,0 +1,4 @@
+﻿【升级方式】请前往 GitHub 发布页 https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.0.0下载 Codex-Skin-Manager-Setup.exe，先退出 CodexPage，再覆盖安装；无需卸载，壁纸库和设置保留。
+
+CodexPage 2.0.0：全新名称与艺术字，更新界面与安装入口；修复成功切换壁纸后误回滚的问题。
+本地测试版 2.0.0 用户请手动覆盖安装，同版本号不会触发自动更新。

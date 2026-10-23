@@ -1,7 +1,15 @@
 ﻿function New-DynamicUpdateProgressWindow {
   Add-Type -AssemblyName PresentationFramework
   $reader=[Xml.XmlReader]::Create((Join-Path $PSScriptRoot 'update-progress.xaml'))
-  try{return [Windows.Markup.XamlReader]::Load($reader)}finally{$reader.Dispose()}
+  try{$window=[Windows.Markup.XamlReader]::Load($reader)}finally{$reader.Dispose()}
+  $wordmark=Join-Path $PSScriptRoot 'codexpage-wordmark.png'
+  if(-not(Test-Path -LiteralPath $wordmark)){$wordmark=Join-Path (Split-Path $PSScriptRoot -Parent) 'appearance/codexpage-wordmark.png'}
+  if(Test-Path -LiteralPath $wordmark){
+    $frame=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$wordmark,[Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat,[Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
+    $frame.Freeze();$window.FindName('UpdateWordmark').Source=$frame
+    $window.FindName('UpdateWordmark').Visibility='Visible';$window.FindName('UpdateHeading').Text='正在更新'
+  }
+  return $window
 }
 
 function Show-DynamicUpdateInstallProgress {
@@ -52,10 +60,10 @@ function Show-DynamicUpdateInstallProgress {
     $bar.IsIndeterminate=$false
     if($state.Result.Success){
       $bar.Value=100;$window.FindName('UpdateHeading').Text='更新完成'
-      $status.Text='已更新至 '+$TargetVersion;$detail.Text='正在重新打开管理中心…'
+      $status.Text='已更新至 '+$TargetVersion;$detail.Text='正在重新打开 CodexPage…'
     }else{
       $bar.Visibility='Collapsed';$window.FindName('UpdateHeading').Text='更新未完成'
-      $status.Text=$state.Result.Message;$detail.Text='返回管理中心后可重试更新。';$button.Visibility='Visible'
+      $status.Text=$state.Result.Message;$detail.Text='返回 CodexPage 后可重试更新。';$button.Visibility='Visible'
     }
   }.GetNewClosure())
   try{$null=$window.ShowDialog();return $state.Result}

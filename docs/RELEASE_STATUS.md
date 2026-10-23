@@ -2,7 +2,7 @@
 
 发布日期：2026-10-20（北京时间）。用户已授权检查通过后直接发布，并要求更新 GitHub 主页预览图。
 
-- 发布页：https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.0
+- 发布页：https://github.com/JiPaiFan1109/CodexPage/releases/tag/v1.1.0
 - GitHub main 与 v1.1.0 标签均指向：5e0195176a19c8631f80d3ba0a497540d2360b02。
 - 公开源代码本地副本：.tools/release-publish-1.1.0（工作区干净）。候选源 outputs/release-candidate-1.1.0；新增运行修正已同步第九版草稿。
 - 最终发布资产：outputs/release-1.1.0-final。早期 outputs/release-1.1.0 已标记为被替代，不可重新发布。
@@ -15,7 +15,7 @@
 
 - 补全发布清单中的 existing-session.ps1、multi-instance.ps1 和更新进度窗口依赖。
 - 多窗口监测写入进程及工作子进程身份；安装前验证路径、启动时间、父进程和启动参数，先停止监测再停止子进程，不终止 Codex。
-- 管理中心重新打开后恢复已有壁纸状态的监测。
+- CodexPage 重新打开后恢复已有壁纸状态的监测。
 
 ## 验证
 

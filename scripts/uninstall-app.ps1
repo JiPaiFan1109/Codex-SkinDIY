@@ -9,7 +9,7 @@ function Invoke-DynamicUninstallRestore {
   $hasSkin=(Test-Path (Join-Path $InstallRoot 'state.json')) -or
     ($hasTheme -and -not (Test-Path (Join-Path $InstallRoot 'paused')))
   if(-not $hasSkin){return $true}
-  if($Silent){throw '请先在换肤管理中心恢复原始外观，再执行静默卸载。'}
+  if($Silent){throw '请先在 CodexPage 恢复原始外观，再执行静默卸载。'}
   Initialize-DynamicMedia -InstallRoot $InstallRoot
   if((Invoke-DynamicEngine -StateRoot $InstallRoot -Restore) -ne $true){throw [OperationCanceledException]::new('已取消恢复，卸载已停止。')}
   # The engine removes its pause file; retained themes must stay inactive after uninstall.

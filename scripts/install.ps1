@@ -143,7 +143,7 @@ function Install-DynamicSkin {
     if($root -ieq$defaultRoot){
       $legacyRoot=Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
       $migration=Copy-DynamicSkinLegacyStateToStage -LegacyRoot $legacyRoot -InstallRoot $root -StageRoot $stage
-      if($migration.Migrated){Write-Output 'Migrated the existing Dream Skin theme to Codex Dynamic Skin.'}
+      if($migration.Migrated){Write-Output 'Migrated the existing Dream Skin theme to CodexPage.'}
     }
     Get-ChildItem -LiteralPath $stage -Recurse -File | Unblock-File
     if (-not $SkipShortcuts) {
@@ -178,7 +178,7 @@ function Install-DynamicSkin {
       $shell = New-Object -ComObject WScript.Shell
       foreach ($spec in @(
         @($launchName, 'engine/launcher/CodexDynamicSkinLauncher.exe', '', $true),
-        @('Codex Background Manager', 'scripts/manage-background.ps1', '', $false),
+        @('CodexPage', 'scripts/manage-background.ps1', '', $false),
         @('Restore Codex Appearance', 'engine/scripts/restore-dream-skin.ps1', ' -PromptRestart', $false)
       )) {
         $linkPath = Join-Path $DesktopPath ($spec[0] + '.lnk')
@@ -193,7 +193,7 @@ function Install-DynamicSkin {
         $link.WorkingDirectory = $root
         $link.IconLocation = $icon
         $managerIcon = Join-Path $root 'appearance/skin-manager.ico'
-        if ($spec[0] -eq 'Codex Background Manager' -and (Test-Path -LiteralPath $managerIcon -PathType Leaf)) {
+        if ($spec[0] -eq 'CodexPage' -and (Test-Path -LiteralPath $managerIcon -PathType Leaf)) {
           $link.IconLocation = $managerIcon + ',0'
         }
         $link.Save()
@@ -211,7 +211,7 @@ function Install-DynamicSkin {
     # The exact staging child is generated above, and never accepts caller input.
     if (Test-Path -LiteralPath $stage) { Assert-DynamicSkinTree $stage; Remove-Item -LiteralPath $stage -Recurse -Force }
   }
-  Write-Output "Installed Codex Dynamic Skin at $root. Backup: $backup"
+  Write-Output "Installed CodexPage at $root. Backup: $backup"
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

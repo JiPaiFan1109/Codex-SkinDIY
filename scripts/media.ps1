@@ -219,6 +219,10 @@ function Invoke-DynamicEngine {
   $process = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $arguments -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput (Join-Path $logs ($attempt + '-output.log')) `
     -RedirectStandardError (Join-Path $logs ($attempt + '-error.log'))
+  # Windows PowerShell 5.1 can lose ExitCode for redirected Start-Process
+  # children unless the handle is retained before they exit. A null code
+  # otherwise rejects a verified success and rolls the wallpaper back.
+  $null = $process.Handle
   while (-not $process.HasExited) { if ([Environment]::UserInteractive -and ('System.Windows.Forms.Application' -as [type])) { [Windows.Forms.Application]::DoEvents() }; Start-Sleep -Milliseconds 100 }
   $process.WaitForExit(); $process.Refresh()
   # The engine writes a bounded result even when its process exits unsuccessfully.

@@ -331,7 +331,7 @@ function Remove-DynamicWallpaper {
     if($status.Error){throw ('无法确认当前背景，暂不能删除：'+$status.Error)}
     if($status.CurrentId -eq $Id){throw '请先应用其他壁纸或恢复原始外观，再删除当前壁纸。'}
     $video=Read-DynamicCurrentVideo $StateRoot
-    if($video -and [IO.Path]::GetFullPath($video.filePath).StartsWith($directory+'\',[StringComparison]::OrdinalIgnoreCase)){throw '动态背景仍引用此壁纸，请先切换或在管理中心恢复原始外观。'}
+    if($video -and [IO.Path]::GetFullPath($video.filePath).StartsWith($directory+'\',[StringComparison]::OrdinalIgnoreCase)){throw '动态背景仍引用此壁纸，请先切换或在 CodexPage 恢复原始外观。'}
     if(Test-Path -LiteralPath $directory){
       # Refuse unexpected nested folders or reparse files before recursive deletion.
       foreach($child in Get-ChildItem -LiteralPath $directory -Force){

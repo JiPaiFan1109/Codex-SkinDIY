@@ -184,6 +184,8 @@ function Save-DynamicAppUpdate {
     if($Report){& $Report '正在校验更新包…'}
     Assert-DynamicUpdateFile $setup $verified
     foreach($name in @('app-update.ps1','finish-update.ps1','update-progress.ps1','update-progress.xaml','update-public-key.xml')){Copy-Item -LiteralPath (Join-Path $InstallRoot ('scripts/'+$name)) -Destination $temp}
+    $wordmark=Join-Path $InstallRoot 'appearance/codexpage-wordmark.png'
+    if(Test-Path -LiteralPath $wordmark){Copy-Item -LiteralPath $wordmark -Destination $temp}
     return $temp
   }catch{Remove-Item -LiteralPath $temp -Recurse -Force;throw}
 }

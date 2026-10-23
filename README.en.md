@@ -3,11 +3,11 @@
 </p>
 <p align="center">Give Codex an image or animated background. Import, preview, and switch wallpapers in one window.</p>
 <p align="center">
-  <a href="https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download/Codex-Skin-Manager-Setup.exe"><strong>Download for Windows</strong></a>
+  <a href="https://github.com/JiPaiFan1109/CodexPage/releases/latest/download/Codex-Skin-Manager-Setup.exe"><strong>Download for Windows</strong></a>
   · <a href="README.md">中文</a> · <a href="CHANGELOG.md">Changelog</a>
 </p>
 <p align="center">
-  <a href="https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest"><img src="https://img.shields.io/github/v/release/JiPaiFan1109/Codex-SkinDIY?display_name=tag&sort=semver" alt="Latest release"></a>
+  <a href="https://github.com/JiPaiFan1109/CodexPage/releases/latest"><img src="https://img.shields.io/github/v/release/JiPaiFan1109/CodexPage?display_name=tag&sort=semver" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/Windows-x64-0078D4" alt="Windows x64">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="MIT License"></a>
 </p>
@@ -17,10 +17,10 @@ A community tool, **not an official OpenAI product or affiliated with OpenAI**. 
 ## Interface and features
 
 <p align="center">
-  <img src="docs/images/skin-manager-v1.1.0.png" width="1100" alt="New CodexPage: a full gallery of 12 sample wallpapers in 3 rows and 4 columns">
+  <img src="docs/images/skin-manager-v2.0.0.png" width="1100" alt="New CodexPage: a full gallery of 12 sample wallpapers in 3 rows and 4 columns">
 </p>
 
-New manager illustration: 12 sample wallpapers fill a 3-row, 4-column gallery. Sample artwork is for illustration and is not bundled as preset wallpapers. [View full screenshot](docs/images/skin-manager-v1.1.0.png).
+CodexPage 2.0.0 interface illustration: 12 sample wallpapers fill a 3-row, 4-column gallery. Sample artwork is for illustration and is not bundled as preset wallpapers. [View full screenshot](docs/images/skin-manager-v2.0.0.png).
 
 - **Images and videos:** import local files and use them as Codex backgrounds.
 - **Wallpaper library:** card gallery, image/video filters, large previews, silent video playback, renaming, and deletion.
@@ -40,22 +40,23 @@ Recorded from a real Codex window after checking for sensitive information. The 
 
 ## Important updates
 
-> **Upgrading to 1.2.1: download `Codex-Skin-Manager-Setup.exe` from the [GitHub release page](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1), exit CodexPage, then run setup over your existing installation. Do not use Update now in the old version for this upgrade. No uninstall is needed; your wallpaper library and settings are retained.**
+> **Upgrading to 2.0.0: download `Codex-Skin-Manager-Setup.exe` from the [GitHub release page](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.0.0), exit CodexPage, then run setup over your existing installation. Do not use Update now in the old version for this upgrade. No uninstall is needed; your wallpaper library and settings are retained.**
 
 | Date (Beijing time) | Version | Changes |
 | --- | --- | --- |
-| 2026-10-22 | [1.2.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1) | Fix the manager failing to exit during updates and recovery after installer-helper exit or startup timeout; include the missing video-cache dependency; emphasize manual-upgrade notices in dark red in the new UI (old versions retain normal text) |
-| 2026-10-22 | [1.2.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.0) | Fix false disconnected status for Microsoft Store Codex, support reconnecting and manual Codex location, and improve connection diagnostics |
-| 2026-10-20 | [1.1.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.1) | Fix update installation and download verification failures; improve update checks on restricted networks |
-| 2026-10-20 | [1.1.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.0) | Easier in-app updates, wallpaper recovery, multiple windows, clarity fixes, and folder refresh |
-| 2026-10-17 | [0.3.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.3.0) | In-app update notices and one-click upgrades with signed manifests; wallpaper library retained |
-| 2026-10-16 | [0.2.2](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.2) | Setup safely retires verified skin helpers left after windows close, preserving Codex and user data |
-| 2026-10-13 | [0.2.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.1) | Fixed repeated cancellation/restore prompts and the status helper; added upgrade preflight and reduced unnecessary dialogs |
-| 2026-10-13 | [0.2.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.0) | Windows setup, full manager, transparent icon, local Codex detection, and removal of unused upstream tray/features |
-| 2026-10-08 | [0.1.3](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.1.3) | Improved launch entry, multiple-instance protection, and legacy theme migration |
-| 2026-10-07 | [0.1.2](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.1.2) | Fixed startup rollback after updates and improved reopening |
-| 2026-10-02 | [0.1.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.1.1) | Silent verification and compatibility with the updated home screen |
-| 2026-10-01 | [0.1.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.1.0) | First public release with images, videos, and appearance restoration |
+| 2026-10-23 | [2.0.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.0.0) | Renamed to CodexPage, refreshed wordmark and interface illustration, fixed erroneous rollback after a successful wallpaper switch; library and settings preserved |
+| 2026-10-22 | [1.2.1](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v1.2.1) | Fix the manager failing to exit during updates and recovery after installer-helper exit or startup timeout; include the missing video-cache dependency; emphasize manual-upgrade notices in dark red in the new UI (old versions retain normal text) |
+| 2026-10-22 | [1.2.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v1.2.0) | Fix false disconnected status for Microsoft Store Codex, support reconnecting and manual Codex location, and improve connection diagnostics |
+| 2026-10-20 | [1.1.1](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v1.1.1) | Fix update installation and download verification failures; improve update checks on restricted networks |
+| 2026-10-20 | [1.1.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v1.1.0) | Easier in-app updates, wallpaper recovery, multiple windows, clarity fixes, and folder refresh |
+| 2026-10-17 | [0.3.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v0.3.0) | In-app update notices and one-click upgrades with signed manifests; wallpaper library retained |
+| 2026-10-16 | [0.2.2](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v0.2.2) | Setup safely retires verified skin helpers left after windows close, preserving Codex and user data |
+| 2026-10-13 | [0.2.1](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v0.2.1) | Fixed repeated cancellation/restore prompts and the status helper; added upgrade preflight and reduced unnecessary dialogs |
+| 2026-10-13 | [0.2.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v0.2.0) | Windows setup, full manager, transparent icon, local Codex detection, and removal of unused upstream tray/features |
+| 2026-10-08 | [0.1.3](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v0.1.3) | Improved launch entry, multiple-instance protection, and legacy theme migration |
+| 2026-10-07 | [0.1.2](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v0.1.2) | Fixed startup rollback after updates and improved reopening |
+| 2026-10-02 | [0.1.1](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v0.1.1) | Silent verification and compatibility with the updated home screen |
+| 2026-10-01 | [0.1.0](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v0.1.0) | First public release with images, videos, and appearance restoration |
 
 See the [full changelog](CHANGELOG.md) for details.
 
@@ -63,7 +64,7 @@ See the [full changelog](CHANGELOG.md) for details.
 
 Supports **Windows x64 with the official Microsoft Store OpenAI.Codex package**. This version does not support macOS, Linux, Windows ARM64, or other Codex distributions.
 
-1. **[Download setup](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download/Codex-Skin-Manager-Setup.exe)** and run `Codex-Skin-Manager-Setup.exe`.
+1. **[Download setup](https://github.com/JiPaiFan1109/CodexPage/releases/latest/download/Codex-Skin-Manager-Setup.exe)** and run `Codex-Skin-Manager-Setup.exe`.
 2. Open **CodexPage** from the desktop or Start menu. The bottom of the window shows the detected Codex version. If needed, install the official client and select **重新检测** (Detect again).
 3. Select **导入壁纸** (Import wallpaper). Importing saves a file without applying it; select it to preview.
 4. Select **应用壁纸** (Apply). Save your work before accepting a Codex restart prompt.
@@ -84,11 +85,11 @@ The default **Night Sky** image is generated by this project. See the [acquisiti
 
 ### Upgrades, uninstalling, and troubleshooting
 
-- **Upgrade to 1.2.1:** download setup from the [GitHub release page](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1), exit the manager, then install over the existing version. Do not use Update now in the old version for this upgrade. No uninstall is needed; your library and settings are retained. Reapply your wallpaper afterward to reconnect. The manager checks once daily while open and supports Later and Skip this version; no notifications are delivered while it is closed.
+- **Upgrade to 2.0.0:** download setup from the [GitHub release page](https://github.com/JiPaiFan1109/CodexPage/releases/tag/v2.0.0), exit the manager, then install over the existing version. Do not use Update now in the old version for this upgrade. No uninstall is needed; your library and settings are retained. Reapply your wallpaper afterward to reconnect. The manager checks once daily while open and supports Later and Skip this version; no notifications are delivered while it is closed.
 - **Uninstall:** use Windows Installed apps. Restoration must finish first; cancellation or failure aborts uninstall. The library is retained.
 - **Codex not found:** verify that the current Windows user has the official Store package, then detect again.
 - **No skin after using the official entry:** open Codex from the manager or apply a wallpaper again, following any restart prompt.
-- **Failure after a Codex update:** client layout and launch behavior can change. Check [Releases](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases) for compatibility updates.
+- **Failure after a Codex update:** client layout and launch behavior can change. Check [Releases](https://github.com/JiPaiFan1109/CodexPage/releases) for compatibility updates.
 
 ## Technical details and source builds
 
@@ -100,7 +101,7 @@ The default **Night Sky** image is generated by this project. See the [acquisiti
 - Default installation, startup, and restoration do not rewrite global `%USERPROFILE%\.codex\config.toml`. Legacy recovery safeguards remain.
 - Packages bundle pinned Node.js 24.19.0 x64 and its license, verifying SHA-256 and the OpenJS Foundation signature. Project EXEs have no project code-signing certificate; the Node.js signature does not sign this installer. Disabling Windows security is not required.
 - Windows media components convert video to silent H.264 MP4 within 1920 × 1080 at 30 fps, preserving aspect ratio.
-- The [Release ZIP](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases) remains available: extract everything and run `Install.cmd`. Automatic source archives do not include the runtime.
+- The [Release ZIP](https://github.com/JiPaiFan1109/CodexPage/releases) remains available: extract everything and run `Install.cmd`. Automatic source archives do not include the runtime.
 - Background processes and videos use memory and CPU/GPU resources. Compatibility with every Codex version and zero overhead are not guaranteed.
 
 </details>

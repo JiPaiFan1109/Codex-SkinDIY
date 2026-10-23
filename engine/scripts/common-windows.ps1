@@ -1324,7 +1324,7 @@ function Stop-DreamSkinCodex {
 function Confirm-DreamSkinRestart {
   param([string]$Message)
   $shell = New-Object -ComObject WScript.Shell
-  return $shell.Popup($Message, 0, 'Codex 换肤管理中心', 52) -eq 6
+  return $shell.Popup($Message, 0, 'CodexPage', 52) -eq 6
 }
 
 function Invoke-DreamSkinCodexWindowActivation {

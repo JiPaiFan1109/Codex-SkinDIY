@@ -1,4 +1,4 @@
-# Security
+﻿# Security
 
 CodexPage 0.1.0 is a community modification for the official Windows x64 `OpenAI.Codex` Store package. It is not an OpenAI security boundary or an official extension API.
 
@@ -10,10 +10,10 @@ The project uses `%LOCALAPPDATA%\CodexDynamicSkin` for its own installation and 
 
 Release builds pin Node.js 24.19.0 and verify its archive hash. Both build and installation verify the executable hash and OpenJS Foundation Authenticode signature. Node.js's signature covers that runtime, not this project's scripts. Release archives include a file manifest and an external SHA-256 checksum for integrity checks; a checksum alone is not independent proof of publisher identity.
 
-Keep Windows protections enabled. Use release files from [this repository](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases), and inspect unexpected installation errors rather than disabling protections. Unsupported package identity or launch behavior should be treated as a compatibility issue.
+Keep Windows protections enabled. Use release files from [this repository](https://github.com/JiPaiFan1109/CodexPage/releases), and inspect unexpected installation errors rather than disabling protections. Unsupported package identity or launch behavior should be treated as a compatibility issue.
 
 ## Reporting
 
-For ordinary compatibility problems, use the repository's [Issues](https://github.com/JiPaiFan1109/Codex-SkinDIY/issues) and include Windows architecture, Codex version, project version, and a redacted error message.
+For ordinary compatibility problems, use the repository's [Issues](https://github.com/JiPaiFan1109/CodexPage/issues) and include Windows architecture, Codex version, project version, and a redacted error message.
 
 For a vulnerability, use GitHub's private vulnerability reporting option in this repository's Security tab **if it is available**. Do not post credentials, account data, debugging tokens, or a working exploit against users in a public issue. If private reporting is unavailable, open a minimal issue asking the maintainer for a private reporting channel without disclosing exploit details. There is no guaranteed response time or claim of a completed independent security audit.

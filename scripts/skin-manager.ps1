@@ -116,7 +116,7 @@ function Get-DynamicManagerErrorMessage {
   while($null -ne $Exception.InnerException){$Exception=$Exception.InnerException}
   $message=$Exception.Message
   $reasons=@{
-    'cdp-launch-failed'='未能启动换肤版 Codex，请保存工作并关闭 Codex，再从管理中心重试。'
+    'cdp-launch-failed'='未能启动换肤版 Codex，请保存工作并关闭 Codex，再从 CodexPage 重试。'
     'cdp-direct-access-denied'='Windows 阻止了换肤启动。请查看启动日志中的拒绝访问详情，并提供日志供排查。'
     'cdp-endpoint-unavailable'='未能建立 Codex 换肤连接，请保存工作并关闭 Codex，再点击图标重试；仍失败时请提供启动日志供排查。'
     'port-unavailable'='换肤连接端口不可用，请稍后重试。'
@@ -188,7 +188,7 @@ namespace DynamicSkin {
   $window.FindName('MinimizeButton').Add_Click({$script:SkinManager.Window.WindowState='Minimized'})
   $window.FindName('MaximizeButton').Add_Click({Switch-DynamicManagerZoom $script:SkinManager.Window})
   $window.FindName('CloseWindowButton').Add_Click({$script:SkinManager.Window.Close()})
-  foreach($asset in @(@('EngineNavImage','wallpaper-engine.png'),@('ApplyIcon','apply-wallpaper.png'),@('ConfirmationIcon','confirmation-icon.png'))){
+  foreach($asset in @(@('BrandWordmark','codexpage-wordmark.png'),@('ConfirmationWordmark','codexpage-wordmark.png'),@('EngineNavImage','wallpaper-engine.png'),@('ApplyIcon','apply-wallpaper.png'),@('ConfirmationIcon','confirmation-icon.png'))){
     $path=Join-Path (Split-Path $PSScriptRoot -Parent) ('appearance/'+$asset[1])
     $frame=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$path,[Windows.Media.Imaging.BitmapCreateOptions]::PreservePixelFormat,[Windows.Media.Imaging.BitmapCacheOption]::OnLoad)
     $frame.Freeze();$window.FindName($asset[0]).Source=$frame
@@ -545,7 +545,7 @@ function Show-DynamicWallpaperRename {
 
 function Show-DynamicSkinManager {
   param([string]$InstallRoot,[string]$StateRoot,[switch]$PrepareOnly)
-  if([Threading.Thread]::CurrentThread.ApartmentState -ne 'STA'){throw '管理中心需要在 STA 模式下运行，请使用 powershell.exe -STA 启动。'}
+  if([Threading.Thread]::CurrentThread.ApartmentState -ne 'STA'){throw 'CodexPage 需要在 STA 模式下运行，请使用 powershell.exe -STA 启动。'}
   $window=New-DynamicSkinManagerWindow
   $controls=@{}
   foreach($name in @('EngineRefreshButton','EngineSearchSpinner','EngineSearchRotation','EngineSearchStatus','PreviewShade','OpacityPanel','WallpaperOpacitySlider','OpacityValue','GalleryPager','PageLabel','PreviousPageButton','NextPageButton','ImportButton','ImageFilter','VideoFilter','WallpaperList','EmptyState','EmptyTitle','PreviewPlaceholder','PreviewImage','PreviewVideo','SelectedName','SelectedDetails','SelectedFormat','SelectedSize','SelectedImportedAt','SelectedStatus','PreviewNotice','ApplyButton','RenameButton','DeleteButton','WorkProgress','StatusText','OpenButton','RestoreButton')){$controls[$name]=$window.FindName($name)}

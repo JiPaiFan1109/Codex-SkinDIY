@@ -1,4 +1,4 @@
-# Windows 安装应用
+﻿# Windows 安装应用
 
 版本：1.0.0。目标为 Windows x64，用户已安装官方 Microsoft Store OpenAI.Codex 包。
 

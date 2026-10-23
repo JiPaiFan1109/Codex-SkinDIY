@@ -11,9 +11,9 @@ function Invoke-DynamicUpdateInstall {
   $setup=Join-Path $Stage 'setup.exe'
   Assert-DynamicUpdateFile $setup $manifest
   if($ParentId -gt 0){
-    if($Report){& $Report '正在关闭管理中心，准备安装…'}
+    if($Report){& $Report '正在关闭 CodexPage，准备安装…'}
     $parent=Get-Process -Id $ParentId -ErrorAction SilentlyContinue
-    if($parent){try{if(-not $parent.WaitForExit(30000)){throw '管理中心尚未退出，已停止升级。'}}finally{$parent.Dispose()}}
+    if($parent){try{if(-not $parent.WaitForExit(30000)){throw 'CodexPage 尚未退出，已停止升级。'}}finally{$parent.Dispose()}}
   }
   # The native launcher owns this mutex until its PowerShell child exits.
   $watch=[Diagnostics.Stopwatch]::StartNew()
@@ -21,7 +21,7 @@ function Invoke-DynamicUpdateInstall {
     $mutex=$null
     try{$mutex=[Threading.Mutex]::OpenExisting('CodexDynamicSkinManager')}catch [Threading.WaitHandleCannotBeOpenedException]{break}
     finally{if($mutex){$mutex.Dispose()}}
-    if($watch.Elapsed.TotalSeconds -gt 30){throw '管理中心仍在运行，已停止升级。'}
+    if($watch.Elapsed.TotalSeconds -gt 30){throw 'CodexPage 仍在运行，已停止升级。'}
     Start-Sleep -Milliseconds 200
   }
   # Keep the payload read-locked until setup exits, preventing replacement after verification.
@@ -33,7 +33,7 @@ function Invoke-DynamicUpdateInstall {
     try{$process.WaitForExit();$exitCode=$process.ExitCode}finally{$process.Dispose()}
     if($exitCode -ne 0){throw ('安装未完成（代码 '+$exitCode+'）。请关闭占用程序后重试。安装日志：'+(Join-Path $Stage 'install.log'))}
     if($Report){& $Report '正在确认安装结果…'}
-    if([IO.File]::ReadAllText((Join-Path $Root 'VERSION')).Trim() -cne $TargetVersion){throw '安装后的版本校验失败，请返回管理中心重试。'}
+    if([IO.File]::ReadAllText((Join-Path $Root 'VERSION')).Trim() -cne $TargetVersion){throw '安装后的版本校验失败，请返回 CodexPage 重试。'}
   }finally{$lock.Dispose()}
 }
 

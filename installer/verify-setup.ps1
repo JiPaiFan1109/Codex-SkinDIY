@@ -38,8 +38,8 @@ try{
       $childInfo=Get-CimInstance Win32_Process -Filter ("ParentProcessId="+$manager.Id+" AND Name='powershell.exe'")|Select-Object -First 1
       if($childInfo){$child=Get-Process -Id $childInfo.ProcessId -ErrorAction SilentlyContinue}
       if($manager.HasExited){throw 'Installed application exited before opening its manager window'}
-    }while(($null -eq $child -or $child.MainWindowTitle -ne 'Codex 皮肤管理中心') -and [datetime]::UtcNow -lt $deadline)
-    if($null -eq $child -or $child.MainWindowTitle -ne 'Codex 皮肤管理中心'){throw 'Installed application did not open the manager window'}
+    }while(($null -eq $child -or $child.MainWindowTitle -ne 'CodexPage') -and [datetime]::UtcNow -lt $deadline)
+    if($null -eq $child -or $child.MainWindowTitle -ne 'CodexPage'){throw 'Installed application did not open the manager window'}
     # Refresh/import startup can be busy briefly; Closing intentionally refuses during work.
     do{
       $null=$child.CloseMainWindow()

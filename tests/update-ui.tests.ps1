@@ -21,7 +21,7 @@ try{
   $ui.Controls.UpdateBanner.Visibility='Visible'
   $ui.Controls.LaterUpdateButton.RaiseEvent((New-Object Windows.RoutedEventArgs ([Windows.Controls.Button]::ClickEvent)))
   if($ui.Controls.UpdateBanner.Visibility -ne 'Collapsed'){throw 'Later button did not dismiss the update'}
-  $ui.AvailableUpdate=[pscustomobject]@{version='1.0.0';notes="1.皮肤管理中心界面升级`n2.能够自动批量引入本地Wallpaper Engine壁纸"}
+  $ui.AvailableUpdate=[pscustomobject]@{version='1.0.0';notes="1.CodexPage界面升级`n2.能够自动批量引入本地Wallpaper Engine壁纸"}
   Show-DynamicUpdateNotice
   if($ui.Controls.UpdateText.Text -notmatch '1.0.0' -or $ui.Controls.UpdateText.Text -notmatch '0.3.0'){throw 'Update notice must show candidate and installed versions'}
   if($ui.Controls.UpdateNotes.Text -notmatch 'Wallpaper Engine'){throw 'Release highlights missing'}
