@@ -1,7 +1,8 @@
 ﻿<p align="center">
-  <img src="docs/images/app-icon.png" width="128" height="128" alt="Codex Skin Manager icon">
+  <img src="appearance/codexpage-wordmark.png" width="480" alt="CodexPage">
 </p>
-<h1 align="center">Codex Skin Manager</h1>
+<h1 align="center">CodexPage</h1>
+<p align="center">Codex壁纸 · CodexDIY · Codex背景</p>
 <p align="center">Give Codex an image or animated background. Import, preview, and switch wallpapers in one window.</p>
 <p align="center">
   <a href="https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download/Codex-Skin-Manager-Setup.exe"><strong>Download for Windows</strong></a>
@@ -15,10 +16,12 @@
 
 A community tool, **not an official OpenAI product or affiliated with OpenAI**. Install the official Microsoft Store edition of Codex first. The application interface is currently in Chinese.
 
+> The project is now **CodexPage**. Existing public installers may still show the previous name. Installation paths, wallpaper libraries, and download filenames remain compatible.
+
 ## Interface and features
 
 <p align="center">
-  <img src="docs/images/skin-manager-v1.1.0.png" width="1100" alt="New Codex Skin Manager: a full gallery of 12 sample wallpapers in 3 rows and 4 columns">
+  <img src="docs/images/skin-manager-v1.1.0.png" width="1100" alt="New CodexPage: a full gallery of 12 sample wallpapers in 3 rows and 4 columns">
 </p>
 
 New manager illustration: 12 sample wallpapers fill a 3-row, 4-column gallery. Sample artwork is for illustration and is not bundled as preset wallpapers. [View full screenshot](docs/images/skin-manager-v1.1.0.png).
@@ -41,7 +44,7 @@ Recorded from a real Codex window after checking for sensitive information. The 
 
 ## Important updates
 
-> **Upgrading to 1.2.1: download `Codex-Skin-Manager-Setup.exe` from the [GitHub release page](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1), exit Skin Manager, then run setup over your existing installation. Do not use Update now in the old version for this upgrade. No uninstall is needed; your wallpaper library and settings are retained.**
+> **Upgrading to 1.2.1: download `Codex-Skin-Manager-Setup.exe` from the [GitHub release page](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1), exit CodexPage, then run setup over your existing installation. Do not use Update now in the old version for this upgrade. No uninstall is needed; your wallpaper library and settings are retained.**
 
 | Date (Beijing time) | Version | Changes |
 | --- | --- | --- |
@@ -65,7 +68,7 @@ See the [full changelog](CHANGELOG.md) for details.
 Supports **Windows x64 with the official Microsoft Store OpenAI.Codex package**. This version does not support macOS, Linux, Windows ARM64, or other Codex distributions.
 
 1. **[Download setup](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download/Codex-Skin-Manager-Setup.exe)** and run `Codex-Skin-Manager-Setup.exe`.
-2. Open **Codex 换肤管理中心** from the desktop or Start menu. The bottom of the window shows the detected Codex version. If needed, install the official client and select **重新检测** (Detect again).
+2. Open **CodexPage** from the desktop or Start menu. The bottom of the window shows the detected Codex version. If needed, install the official client and select **重新检测** (Detect again).
 3. Select **导入壁纸** (Import wallpaper). Importing saves a file without applying it; select it to preview.
 4. Select **应用壁纸** (Apply). Save your work before accepting a Codex restart prompt.
 5. Select **打开 Codex** (Open Codex) for daily use, or use **打开换肤版 Codex** in the Start menu. Select **恢复原始外观** to restore the original appearance.

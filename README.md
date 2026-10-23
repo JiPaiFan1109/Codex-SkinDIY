@@ -1,7 +1,8 @@
 ﻿<p align="center">
-  <img src="docs/images/app-icon.png" width="128" height="128" alt="Codex 换肤管理中心图标">
+  <img src="appearance/codexpage-wordmark.png" width="480" alt="CodexPage">
 </p>
-<h1 align="center">Codex 换肤管理中心</h1>
+<h1 align="center">CodexPage</h1>
+<p align="center">Codex壁纸 · CodexDIY · Codex背景</p>
 <p align="center">为你的 Codex 换上喜欢的图片或动态背景。导入、预览、切换，在一个窗口里完成。</p>
 <p align="center">
   <a href="https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download/Codex-Skin-Manager-Setup.exe"><strong>下载 Windows 安装版</strong></a>
@@ -15,18 +16,20 @@
 
 本项目是社区开发的独立工具，**非 OpenAI 官方产品，与 OpenAI 无隶属关系**。使用前请安装官方 Microsoft Store 版 Codex。
 
+> 项目现名为 **CodexPage**。现有公开安装包可能仍显示旧名称；安装目录、壁纸库和下载文件名保持兼容。
+
 ## 界面与功能
 
 <p align="center">
-  <img src="docs/images/skin-manager-v1.1.0.png" width="1100" alt="Codex 新版换肤管理中心：3 行 4 列、12 张示例壁纸的完整画廊">
+  <img src="docs/images/skin-manager-v1.1.0.png" width="1100" alt="CodexPage：3 行 4 列、12 张示例壁纸的完整画廊">
 </p>
 
-新版管理中心示意图：以 3 行 × 4 列展示 12 张示例壁纸，呈现完整画廊布局（示例素材不随软件预置）。[查看完整截图](docs/images/skin-manager-v1.1.0.png)。
+新版 CodexPage 示意图：以 3 行 × 4 列展示 12 张示例壁纸，呈现完整画廊布局（示例素材不随软件预置）。[查看完整截图](docs/images/skin-manager-v1.1.0.png)。
 
 - **Wallpaper Engine 导入**：左侧入口自动发现 Steam 库，批量复制视频/图片项目；Scene、Web、应用项目暂不支持。
 - **静态与动态背景**：导入本地图片或视频，为 Codex 更换背景。
 - **壁纸收藏库**：卡片浏览、静态/动态分类、大图预览、视频静音播放；支持重命名和删除。
-- **自动识别 Codex**：打开管理中心即可检测本机客户端，点击「应用壁纸」或「打开 Codex」进入换肤流程。
+- **自动识别 Codex**：打开 CodexPage 即可检测本机客户端，点击「应用壁纸」或「打开 Codex」进入换肤流程。
 - **保留收藏，随时恢复**：导入后移动原文件不影响收藏；升级保留壁纸库，可恢复 Codex 原始外观。
 
 <details>
@@ -42,19 +45,19 @@
 
 ## 重要更新
 
-> **1.2.1 升级须知：此次更新请前往 [GitHub 发布页](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1) 下载 `Codex-Skin-Manager-Setup.exe`，先退出皮肤管理中心，再运行安装包覆盖升级。暂勿点击旧版中的「立即更新」；无需卸载，壁纸库和设置保留。**
+> **1.2.1 升级须知：此次更新请前往 [GitHub 发布页](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1) 下载 `Codex-Skin-Manager-Setup.exe`，先退出 CodexPage，再运行安装包覆盖升级。暂勿点击旧版中的「立即更新」；无需卸载，壁纸库和设置保留。**
 
 | 日期（北京时间） | 版本 | 更新内容 |
 | --- | --- | --- |
-| 2026-10-22 | [1.2.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1) | 修复升级时管理中心无法退出、安装辅助进程异常退出或启动超时后的恢复问题；补齐视频缓存依赖；新版界面以深红色强调手动升级提示（旧版仍显示普通文字） |
+| 2026-10-22 | [1.2.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1) | 修复升级时 CodexPage 无法退出、安装辅助进程异常退出或启动超时后的恢复问题；补齐视频缓存依赖；新版界面以深红色强调手动升级提示（旧版仍显示普通文字） |
 | 2026-10-22 | [1.2.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.0) | 修复微软商店版 Codex 连接状态误报，支持重新建立连接和手动定位 Codex，改善连接失败诊断 |
 | 2026-10-20 | [1.1.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.1) | 修复更新安装失败、下载校验失败，改善受限网络下的更新检查 |
 | 2026-10-20 | [1.1.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.1.0) | 更新更方便、壁纸更稳定、多窗口支持、清晰度修复与壁纸目录刷新 |
-| 2026-10-19 | [1.0.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.0.0) | 新版管理中心、Wallpaper Engine 批量导入、快速去重、预览、拖拽排序与签名更新 |
+| 2026-10-19 | [1.0.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.0.0) | 新版 CodexPage、Wallpaper Engine 批量导入、快速去重、预览、拖拽排序与签名更新 |
 | 2026-10-17 | [0.3.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.3.0) | 应用内更新提醒与一键升级，签名校验，保留壁纸库 |
 | 2026-10-16 | [0.2.2](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.2) | 修复窗口关闭后后台仍阻止升级；安装时安全退出已核实的换肤辅助进程，保留 Codex 和用户数据 |
 | 2026-10-13 | [0.2.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.1) | 修复取消后重复提示、重复恢复与进度提示问题；增加升级占用检查，减少卸载及关闭窗口时的多余弹窗 |
-| 2026-10-13 | [0.2.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.0) | Windows 安装应用；完整换肤管理中心与透明图标；自动检测 Codex；清理旧托盘及上游冗余功能 |
+| 2026-10-13 | [0.2.0](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.2.0) | Windows 安装应用；完整 CodexPage 与透明图标；自动检测 Codex；清理旧托盘及上游冗余功能 |
 | 2026-10-08 | [0.1.3](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.1.3) | 改进启动入口，阻止多套 Codex 实例并存，迁移旧动态主题 |
 | 2026-10-07 | [0.1.2](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.1.2) | 修复更新后的启动回滚问题，改善再次打开的速度 |
 | 2026-10-02 | [0.1.1](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v0.1.1) | 自动验证改为静默，适配新版 Codex 首页 |
@@ -67,7 +70,7 @@
 支持 **Windows x64 + 官方 Microsoft Store OpenAI.Codex 客户端**。本版不支持 macOS、Linux、Windows ARM64 或其他来源的 Codex 安装。
 
 1. **[下载安装程序](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download/Codex-Skin-Manager-Setup.exe)**，双击 `Codex-Skin-Manager-Setup.exe` 按向导安装。
-2. 从桌面或开始菜单打开 **Codex 换肤管理中心**。左下角图标显示真实连接状态及 Codex 版本；点击图标可重新检测。
+2. 从桌面或开始菜单打开 **CodexPage**。左下角图标显示真实连接状态及 Codex 版本；点击图标可重新检测。
 3. 点击 **导入壁纸**，选择图片或视频。导入只保存到收藏库；选中后可以先预览。
 4. 点击 **应用壁纸** 切换背景。需要重启 Codex 时，先保存工作，再按提示确认。
 5. 应用壁纸时会自动启动或连接 Codex。也可使用开始菜单中的 **打开换肤版 Codex**；右上角「•••」提供 **检查更新** 和 **恢复原始外观**。
@@ -87,10 +90,10 @@
 
 ### 升级、卸载与常见问题
 
-- **升级至 1.2.1**：请从 [GitHub 发布页](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1) 下载安装包，退出管理中心后覆盖安装，暂勿使用旧版「立即更新」。无需卸载，壁纸库与设置保留；完成后重新应用壁纸即可恢复换肤连接。管理中心打开时每天最多自动检查一次，支持稍后和跳过此版本；应用未运行时不会推送通知。
+- **升级至 1.2.1**：请从 [GitHub 发布页](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/tag/v1.2.1) 下载安装包，退出 CodexPage 后覆盖安装，暂勿使用旧版「立即更新」。无需卸载，壁纸库与设置保留；完成后重新应用壁纸即可恢复换肤连接。CodexPage 打开时每天最多自动检查一次，支持稍后和跳过此版本；应用未运行时不会推送通知。
 - **卸载**：从 Windows「已安装的应用」卸载。卸载前会执行外观恢复；取消或失败时停止卸载。壁纸库默认保留。
 - **未找到 Codex**：确认当前 Windows 用户已安装官方 Store 版客户端，再点击左下角连接图标重试。
-- **从官方入口打开后没有皮肤**：回到管理中心重新应用壁纸，按提示处理正在运行的会话。
+- **从官方入口打开后没有皮肤**：回到 CodexPage 重新应用壁纸，按提示处理正在运行的会话。
 - **Codex 更新后换肤失败**：页面结构和启动方式可能变化，请查看项目新版及 [Releases](https://github.com/JiPaiFan1109/Codex-SkinDIY/releases)。
 
 ## 技术说明与源码构建

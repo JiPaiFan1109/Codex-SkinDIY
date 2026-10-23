@@ -1,6 +1,6 @@
 ﻿# 多实例壁纸监测（开发版本）
 
-所有可验证的官方 Codex 实例跟随管理中心当前壁纸。后台按进程声明的调试端口发现实例，验证注册安装、回环监听归属及 browser ID 后，为独立连接启动 watcher。同一实例的多个页面由现有 watcher 处理。不会扫描任意网络端口，不会自动关闭或重启 Codex。
+所有可验证的官方 Codex 实例跟随 CodexPage 当前壁纸。后台按进程声明的调试端口发现实例，验证注册安装、回环监听归属及 browser ID 后，为独立连接启动 watcher。同一实例的多个页面由现有 watcher 处理。不会扫描任意网络端口，不会自动关闭或重启 Codex。
 
 源文件：engine/scripts/multi-instance.ps1。启动脚本及快速启动入口会启动它；每个 StateRoot 使用独立互斥锁，防止重复服务。当前电脑已为安装目录注册 HKCU Run 的 CodexDynamicSkinInstances；未来打包时需加入对应安装/卸载注册步骤，尚未构建安装包。
 

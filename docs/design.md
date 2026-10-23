@@ -1,4 +1,4 @@
-# Codex Dynamic Skin 0.1.0
+# CodexPage 0.1.0
 
 Windows-only derivative of the MIT-licensed Codex Dream Skin runtime. This project exposes local image/video selection as a supported flow instead of requiring edits to local configuration. It never modifies the official app package or disables its content-security policy.
 

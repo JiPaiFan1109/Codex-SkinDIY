@@ -1,6 +1,6 @@
 # Security
 
-Codex Dynamic Skin 0.1.0 is a community modification for the official Windows x64 `OpenAI.Codex` Store package. It is not an OpenAI security boundary or an official extension API.
+CodexPage 0.1.0 is a community modification for the official Windows x64 `OpenAI.Codex` Store package. It is not an OpenAI security boundary or an official extension API.
 
 ## Local operation
 
