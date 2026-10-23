@@ -1,8 +1,6 @@
 ﻿<p align="center">
   <img src="appearance/codexpage-wordmark.png" width="480" alt="CodexPage">
 </p>
-<h1 align="center">CodexPage</h1>
-<p align="center">Codex壁纸 · CodexDIY · Codex背景</p>
 <p align="center">Give Codex an image or animated background. Import, preview, and switch wallpapers in one window.</p>
 <p align="center">
   <a href="https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download/Codex-Skin-Manager-Setup.exe"><strong>Download for Windows</strong></a>
@@ -15,8 +13,6 @@
 </p>
 
 A community tool, **not an official OpenAI product or affiliated with OpenAI**. Install the official Microsoft Store edition of Codex first. The application interface is currently in Chinese.
-
-> The project is now **CodexPage**. Existing public installers may still show the previous name. Installation paths, wallpaper libraries, and download filenames remain compatible.
 
 ## Interface and features
 
