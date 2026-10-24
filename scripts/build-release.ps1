@@ -64,12 +64,18 @@ try {
   })
   [IO.File]::WriteAllLines((Join-Path $stage 'SHA256SUMS.txt'), $hashes, (New-Object Text.UTF8Encoding($false)))
   New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-  $zipPath = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) "Codex-Dynamic-Skin-$version-windows-x64.zip"
-  if (Test-Path -LiteralPath $zipPath) { throw "Output already exists: $zipPath" }
+  $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
+  $zipPath = Join-Path $outputRoot "CodexPage-$version-windows-x64.zip"
+  $legacyZipPath = Join-Path $outputRoot "Codex-Dynamic-Skin-$version-windows-x64.zip"
+  if ((Test-Path -LiteralPath $zipPath) -or (Test-Path -LiteralPath $legacyZipPath)) { throw "Output already exists: $zipPath" }
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zipPath, [IO.Compression.CompressionLevel]::Optimal, $false)
   $sum = (Get-FileHash -LiteralPath $zipPath -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + [IO.Path]::GetFileName($zipPath)
   [IO.File]::WriteAllText(($zipPath + '.sha256'), $sum + "`n", (New-Object Text.UTF8Encoding($false)))
+  # Preserve the historical archive as a byte-identical compatibility alias.
+  Copy-Item -LiteralPath $zipPath -Destination $legacyZipPath
+  $legacySum = (Get-FileHash -LiteralPath $legacyZipPath -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + [IO.Path]::GetFileName($legacyZipPath)
+  [IO.File]::WriteAllText(($legacyZipPath + '.sha256'), $legacySum + "`n", (New-Object Text.UTF8Encoding($false)))
   Write-Output $zipPath
   Write-Output $sum
 } finally {

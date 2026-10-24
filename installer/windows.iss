@@ -19,7 +19,7 @@ AppSupportURL=https://github.com/JiPaiFan1109/CodexPage/issues
 #ifdef TestInstallRoot
 DefaultDirName={#TestInstallRoot}
 #else
-DefaultDirName={localappdata}\CodexDynamicSkin
+DefaultDirName={localappdata}\CodexPage
 #endif
 UsePreviousAppDir=yes
 DisableDirPage=no

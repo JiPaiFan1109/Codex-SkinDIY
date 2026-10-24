@@ -1,5 +1,5 @@
 ﻿[CmdletBinding()]
-param([string]$InstallRoot=(Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'),[string]$ResultPath)
+param([string]$InstallRoot=(Split-Path $PSScriptRoot -Parent),[string]$ResultPath)
 $ErrorActionPreference='Stop'
 
 function Get-DynamicUpgradeBlockReason {

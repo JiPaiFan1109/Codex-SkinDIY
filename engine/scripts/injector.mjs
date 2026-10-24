@@ -1673,8 +1673,10 @@ async function runWatch(options) {
               await removeFromSession(session);
               await removeEarlyPayload(session, previousEarlyScript);
               earlyScripts.delete(id);
+              // Keep the load listener attached to this live session. The
+              // paused state only disables its target; deleting the marker
+              // here would register a duplicate listener on every resume.
               fallbackTargets.delete(id);
-              fallbackListeners.delete(id);
             } else {
               let nextEarlyScript = null;
               try {

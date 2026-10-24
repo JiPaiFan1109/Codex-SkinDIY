@@ -1,6 +1,15 @@
 ﻿[CmdletBinding()]
 param(
-  [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'),
+  [string]$InstallRoot = $(
+    # Preserve existing script installations; branding must not relocate user data.
+    if (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'CodexPage/scripts/install.ps1') -PathType Leaf) {
+      Join-Path $env:LOCALAPPDATA 'CodexPage'
+    } elseif (Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin/scripts/install.ps1') -PathType Leaf) {
+      Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'
+    } else {
+      Join-Path $env:LOCALAPPDATA 'CodexPage'
+    }
+  ),
   [string]$DesktopPath = [Environment]::GetFolderPath('Desktop'),
   [switch]$SkipShortcuts
 )

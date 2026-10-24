@@ -1,6 +1,6 @@
 ﻿[CmdletBinding(DefaultParameterSetName='Gui')]
 param(
-  [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'CodexDynamicSkin'),
+  [string]$InstallRoot = (Split-Path $PSScriptRoot -Parent),
   [string]$StateRoot,
   [Parameter(ParameterSetName='Image', Mandatory)][string]$ImagePath,
   [Parameter(ParameterSetName='Video', Mandatory)][string]$VideoPath,
