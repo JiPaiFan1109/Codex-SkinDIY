@@ -28,6 +28,8 @@ CodexPage 2.0.0 界面示意图：以 3 行 × 4 列展示 12 张示例壁纸，
 - **自动识别 Codex**：打开 CodexPage 即可检测本机客户端，点击「应用壁纸」或「打开 Codex」进入换肤流程。
 - **保留收藏，随时恢复**：本地导入会保存副本，移动原文件不影响收藏；Steam 引用源文件删除后会从列表消失，下次打开 Codex 回到初始外观；升级保留壁纸库，可恢复 Codex 原始外观。
 
+Steam 直接引用仅支持可直接播放的 H.264 MP4（≤1080p/60fps、≤128 MiB），不自动转码，也不写入持久视频缓存；其他视频可通过本地导入转换并保存副本。Steam 盘离线同样视为源文件不可用，重新连接后可刷新列表。旧版 Steam 专用副本会在刷新且核对原文件一致后转为引用，正在使用的副本暂缓清理。
+
 <details>
 <summary>查看 Codex 动态背景效果</summary>
 
@@ -121,8 +123,7 @@ CodexPage 2.0.0 界面示意图：以 3 行 × 4 列展示 12 张示例壁纸，
 
 如果这个小工具对你有帮助，欢迎支持后续维护。
 
-<p align="center">
-  <a href="docs/images/wechat-donation.jpg"><img src="docs/images/wechat-donation.jpg" alt="微信支付收款码" width="316"></a>
+<p align="left">
+  <a href="docs/images/wechat-donation.jpg"><img src="docs/images/wechat-donation.jpg" alt="微信支付收款码" width="237"></a>
 </p>
 
-Steam 直接引用仅支持可直接播放的 H.264 MP4（≤1080p/60fps、≤128 MiB），不自动转码，也不写入持久视频缓存；其他视频可通过本地导入转换并保存副本。Steam 盘离线同样视为源文件不可用，重新连接后可刷新列表。旧版 Steam 专用副本会在刷新且核对原文件一致后转为引用，正在使用的副本暂缓清理。
