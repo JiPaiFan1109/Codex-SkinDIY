@@ -15,7 +15,9 @@ CodexPage 在首次加载完成后异步检查 GitHub 最新正式 Release。每
 1. 更新 VERSION、package.json、启动器程序集版本，以及中英文说明、更新记录和 `docs/releases/vX.Y.Z.md`。`engine/VERSION` 是上游引擎协议版本，不随应用版本修改。
 2. 构建 EXE/ZIP，运行 Node、Windows 测试与隔离安装生命周期检查。
 3. 运行 `scripts/sign-update.ps1 -OutputDirectory dist -NotesPath docs/releases/vX.Y.Z.md`，该脚本校验生成的签名与包哈希。
-4. 创建草稿 Release，上传 EXE、ZIP、SHA-256 文件、update.json、update.sig，确认完整后发布正式版。
+4. 先运行 `scripts/get-release-assets.ps1 -OutputDirectory dist -Version X.Y.Z`，完整上传其返回的 10 个附件：CodexPage EXE/ZIP 及各自校验文件、旧名兼容 EXE/ZIP 及各自校验文件、update.json、update.sig。检查通过后才创建草稿并上传、核对、发布。禁止仅上传旧名六附件。
+
+主下载入口使用 `CodexPage-Setup.exe`，压缩包使用 `CodexPage-X.Y.Z-windows-x64.zip`。旧名文件是字节一致的兼容副本。旧客户端把签名清单内的历史仓库 URL 和安装包名作为固定来源校验，所以清单继续使用旧 URL；更新查询入口使用 CodexPage 仓库。不能直接删除旧附件或修改签名 URL，否则已有客户端会拒绝更新。
 
 本机签名私钥默认存储在 `%LOCALAPPDATA%\CodexDynamicSkinReleaseKeys\update-rsa.dpapi`，由当前 Windows 用户的 DPAPI 加密。发布工作流从仓库 Actions secret `UPDATE_SIGNING_KEY_XML` 读取私钥。不要在日志中输出私钥，也不要重新生成公钥后直接发布：已安装应用信任原公钥，换钥需要单独设计迁移。请保留当前 Windows 用户和密钥文件的安全备份。
 

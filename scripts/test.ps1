@@ -14,7 +14,7 @@ foreach ($test in Get-ChildItem -LiteralPath (Join-Path $root 'tests') -Filter '
   if($test.Name -eq 'update-release-notice.tests.ps1' -and (-not $ReleaseDirectory -or -not $LegacyPackage)){Write-Host 'Skipping update-release-notice.tests.ps1: pass -ReleaseDirectory and -LegacyPackage';continue}
   Write-Host ('Running ' + $test.Name)
   $arguments = @('-STA','-NoProfile','-ExecutionPolicy','RemoteSigned','-File',$test.FullName)
-  if($test.Name -eq 'app-package.tests.ps1'){$arguments+=@('-SetupPath',(Join-Path $ReleaseDirectory 'Codex-Skin-Manager-Setup.exe'))}
+  if($test.Name -eq 'app-package.tests.ps1'){$arguments+=@('-SetupPath',(Join-Path $ReleaseDirectory 'CodexPage-Setup.exe'))}
   if($test.Name -eq 'update-release-notice.tests.ps1'){$arguments+=@('-ReleaseDirectory',$ReleaseDirectory,'-LegacyPackage',$LegacyPackage)}
   if ($test.Name -in @('install-tests.ps1','install-package-tests.ps1') -or $test.Name -eq 'wallpaper-upgrade.tests.ps1') { $arguments += @('-NodeRuntimePath',$NodeRuntimePath) }
   & powershell.exe @arguments

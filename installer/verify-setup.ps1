@@ -18,7 +18,7 @@ try{
   $version=(Get-Content (Join-Path $PackagePath 'VERSION') -Raw).Trim()
   & $IsccPath /Q ("/DSourceRoot=$PackagePath") ("/DAppVersion=$version") ("/DTestInstallRoot="+(Join-Path $root 'unused-default')) ("/O$root") (Join-Path $PSScriptRoot 'windows.iss')
   if($LASTEXITCODE -ne 0){throw 'Isolated setup compilation failed'}
-  $setup=Join-Path $root 'Codex-Skin-Manager-Setup.exe'
+  $setup=Join-Path $root 'CodexPage-Setup.exe'
   Run-Setup $setup @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',('/DIR="'+$installed+'"'),('/LOG="'+(Join-Path $root 'install.log')+'"'))
   foreach($name in @('CodexSkinManager.exe','engine/runtime/node/node.exe','engine/launcher/CodexDynamicSkinLauncher.exe','appearance/skin-manager.ico','scripts/skin-manager.xaml','unins000.exe')){
     if(-not(Test-Path (Join-Path $installed $name))){throw "Installed application missing $name"}

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -8,8 +8,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("CodexPage")]
 [assembly: AssemblyDescription("CodexPage")]
 [assembly: AssemblyProduct("CodexPage")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("2.2.1.0")]
+[assembly: AssemblyFileVersion("2.2.1.0")]
 
 namespace CodexDynamicSkin {
   static class ManagerProgram {

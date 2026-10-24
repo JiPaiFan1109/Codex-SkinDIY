@@ -43,7 +43,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $buildRoot $zipName) -Destination $OutputDirectory
     Copy-Item -LiteralPath (Join-Path $buildRoot ($zipName+'.sha256')) -Destination $OutputDirectory
   }
-  Write-Output $setup
+  Write-Output $canonicalSetup
   Write-Output $sum
 }finally{
   if([IO.Path]::GetFullPath($buildRoot).StartsWith([IO.Path]::GetTempPath(),[StringComparison]::OrdinalIgnoreCase)){

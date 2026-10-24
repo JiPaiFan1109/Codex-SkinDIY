@@ -1,6 +1,6 @@
 ﻿param([string]$SetupPath)
 $ErrorActionPreference='Stop'
-if(-not $SetupPath){$SetupPath=Join-Path $PSScriptRoot '../dist/Codex-Skin-Manager-Setup.exe'}
+if(-not $SetupPath){$SetupPath=Join-Path $PSScriptRoot '../dist/CodexPage-Setup.exe'}
 if(-not(Test-Path $SetupPath)){throw 'Windows application installer is missing'}
 # Installation lifecycle is exercised only by installer/verify-setup.ps1 with an isolated AppId.
 $sum=([IO.File]::ReadAllText(($SetupPath+'.sha256')) -split '\s+')[0]

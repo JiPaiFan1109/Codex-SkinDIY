@@ -10,4 +10,20 @@ Assert ($app -match "\$canonicalSetupName='CodexPage-Setup\.exe'") 'App build mu
 Assert ($app -match "\$legacySetupName='Codex-Skin-Manager-Setup\.exe'") 'App build must retain legacy setup name.'
 Assert ($app -match 'Copy-Item -LiteralPath \$generatedSetup -Destination \$canonicalSetup') 'Canonical setup must alias the compiled installer.'
 Assert ($app -match 'Copy-Item -LiteralPath \$generatedSetup -Destination \$setup') 'Legacy setup must alias the compiled installer.'
-'PASS canonical and legacy package names preserve byte-identical aliases'
+$installer=[IO.File]::ReadAllText((Join-Path $repo 'installer/windows.iss'))
+Assert ($installer -match '(?m)^OutputBaseFilename=CodexPage-Setup\s*$') 'Compiler must emit the canonical installer name.'
+Assert ($app -match 'Write-Output \$canonicalSetup\b') 'Build output must return the canonical installer path.'
+foreach($readme in @('README.md','README.en.md')){
+  $text=[IO.File]::ReadAllText((Join-Path $repo $readme))
+  Assert ($text.Contains('/releases/latest/download/CodexPage-Setup.exe')) 'Primary download must use CodexPage.'
+  Assert (-not $text.Contains('Codex-Skin-Manager-Setup.exe')) 'README must not direct users to the legacy alias.'
+}
+$workflow=[IO.File]::ReadAllText((Join-Path $repo '.github/workflows/release-windows.yml'))
+Assert ($workflow.Contains('get-release-assets.ps1')) 'CI must validate the complete release inventory.'
+Assert ($workflow.Contains('@assetPaths')) 'CI must upload all validated assets.'
+Assert ($workflow.Contains('--title "CodexPage')) 'Release title must use CodexPage.'
+$verification=[IO.File]::ReadAllText((Join-Path $repo '.github/workflows/verify-windows.yml'))
+Assert (-not $verification.Contains('Expand-Archive .\dist\*.zip')) 'CI extraction must select the canonical ZIP, not both aliases.'
+$updater=[IO.File]::ReadAllText((Join-Path $repo 'scripts/app-update.ps1'))
+Assert (-not $updater.Contains('JiPaiFan1109/Codex-SkinDIY/')) 'Update discovery must use the current repository.'
+'PASS canonical downloads, CI inventory and byte-identical compatibility aliases'

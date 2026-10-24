@@ -31,7 +31,8 @@ jobs:
         shell: powershell
         run: |
           .\scripts\build-release.ps1 -OutputDirectory .\dist
-          Expand-Archive .\dist\*.zip .\dist\package
+          $version = (Get-Content VERSION -Raw).Trim()
+          Expand-Archive -LiteralPath ".\dist\CodexPage-$version-windows-x64.zip" -DestinationPath .\dist\package
           Copy-Item .\dist\package\engine\runtime -Destination .\engine -Recurse
       - name: Windows regressions
         if: always()
@@ -59,7 +60,7 @@ jobs:
         shell: powershell
         run: |
           .\scripts\build-app.ps1 -NodeRuntimePath .\engine\runtime\node\node.exe -OutputDirectory .\dist\application
-          & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File tests/app-package.tests.ps1 -SetupPath .\dist\application\Codex-Skin-Manager-Setup.exe
+          & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File tests/app-package.tests.ps1 -SetupPath .\dist\application\CodexPage-Setup.exe
           if ($LASTEXITCODE -ne 0) { throw 'Setup package checks failed' }
           & powershell.exe -NoProfile -STA -ExecutionPolicy RemoteSigned -File installer/verify-setup.ps1 -PackagePath (Join-Path (Get-Location) 'dist/application/app-package')
           if ($LASTEXITCODE -ne 0) { throw 'Real setup lifecycle checks failed' }

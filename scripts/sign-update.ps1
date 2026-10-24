@@ -5,7 +5,11 @@ $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'app-update.ps1')
 $version=[IO.File]::ReadAllText((Join-Path $repo 'VERSION')).Trim()
 $null=Test-DynamicNewVersion $version '0.0.0'
-$setup=Join-Path $OutputDirectory 'Codex-Skin-Manager-Setup.exe'
+$setup=Join-Path $OutputDirectory 'CodexPage-Setup.exe'
+# Published clients pin this exact legacy URL. Keep the signed wire format and
+# byte-identical alias until those clients have a supported migration path.
+$legacySetup=Join-Path $OutputDirectory 'Codex-Skin-Manager-Setup.exe'
+if((Get-FileHash -LiteralPath $setup).Hash -cne (Get-FileHash -LiteralPath $legacySetup).Hash){throw 'Legacy update alias must match the CodexPage installer.'}
 $manifest=[ordered]@{
   schema=1;version=$version
   url=('https://github.com/JiPaiFan1109/Codex-Dynamic-Skin/releases/download/v'+$version+'/Codex-Skin-Manager-Setup.exe')

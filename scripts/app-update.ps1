@@ -41,6 +41,8 @@ function Read-DynamicSignedUpdate {
   }finally{$rsa.Dispose()}
   $manifest=[Text.Encoding]::UTF8.GetString($bytes)|ConvertFrom-Json
   $null=Test-DynamicNewVersion ([string]$manifest.version) '0.0.0'
+  # This signed URL is a compatibility contract shared with already installed clients.
+  # Discovery uses CodexPage; the legacy asset must remain a byte-identical alias.
   $url='https://github.com/JiPaiFan1109/Codex-Dynamic-Skin/releases/download/v'+$manifest.version+'/Codex-Skin-Manager-Setup.exe'
   if($manifest.schema -ne 1 -or $manifest.version -cne $Version -or $manifest.url -cne $url -or
     $manifest.sha256 -cnotmatch '^[a-f0-9]{64}$' -or $manifest.size -lt 1 -or $manifest.size -gt 300MB -or
@@ -92,7 +94,7 @@ function Write-DynamicUpdateFailure {
 function Receive-DynamicUpdateFile {
   param([string]$Url,[string]$Path,[long]$Limit,[scriptblock]$Report)
   [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
-  $request=[Net.HttpWebRequest]::Create($Url);$request.UserAgent='Codex-Dynamic-Skin-Updater';$request.Timeout=15000;$request.ReadWriteTimeout=15000
+  $request=[Net.HttpWebRequest]::Create($Url);$request.UserAgent='CodexPage-Updater';$request.Timeout=15000;$request.ReadWriteTimeout=15000
   $response=$null;$inputStream=$null;$outputStream=$null;$complete=$false
   try{
     $response=$request.GetResponse()
@@ -132,7 +134,7 @@ function Get-DynamicAppUpdate {
   try{
     $releasePath=Join-Path $temp 'release.json'
     $apiUnavailable=$false
-    try{Receive-DynamicUpdateFile 'https://api.github.com/repos/JiPaiFan1109/Codex-SkinDIY/releases/latest' $releasePath 1MB}
+    try{Receive-DynamicUpdateFile 'https://api.github.com/repos/JiPaiFan1109/CodexPage/releases/latest' $releasePath 1MB}
     catch{
       Write-DynamicUpdateFailure $StateRoot 'check-api' $_.Exception
       $apiUnavailable=$true
@@ -141,7 +143,7 @@ function Get-DynamicAppUpdate {
     if($apiUnavailable){
       # This official Release endpoint does not use the REST API request quota.
       # Its metadata still has to pass the same pinned-key signature checks.
-      $latest='https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/latest/download'
+      $latest='https://github.com/JiPaiFan1109/CodexPage/releases/latest/download'
       try{
         Receive-DynamicUpdateFile ($latest+'/update.json') $json 64KB
         Receive-DynamicUpdateFile ($latest+'/update.sig') $sig 4KB
@@ -160,7 +162,7 @@ function Get-DynamicAppUpdate {
     if(-not(Test-DynamicNewVersion $version $current)){return $null}
     if(-not $Manual -and $state.SkippedVersion -eq $version){return $null}
     if($apiUnavailable){return $verified}
-    $base='https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/download/v'+$version
+    $base='https://github.com/JiPaiFan1109/CodexPage/releases/download/v'+$version
     Receive-DynamicUpdateFile ($base+'/update.json') $json 64KB
     Receive-DynamicUpdateFile ($base+'/update.sig') $sig 4KB
     return Read-DynamicSignedUpdate $json $sig (Join-Path $InstallRoot 'scripts/update-public-key.xml') $version
@@ -175,7 +177,7 @@ function Save-DynamicAppUpdate {
   New-Item $temp -ItemType Directory|Out-Null
   try{
     # Re-fetch and verify the signed release at the download boundary, never trust UI state.
-    $base='https://github.com/JiPaiFan1109/Codex-SkinDIY/releases/download/v'+$Manifest.version
+    $base='https://github.com/JiPaiFan1109/CodexPage/releases/download/v'+$Manifest.version
     Receive-DynamicUpdateFile ($base+'/update.json') (Join-Path $temp 'update.json') 64KB
     Receive-DynamicUpdateFile ($base+'/update.sig') (Join-Path $temp 'update.sig') 4KB
     $verified=Read-DynamicSignedUpdate (Join-Path $temp 'update.json') (Join-Path $temp 'update.sig') (Join-Path $InstallRoot 'scripts/update-public-key.xml') $Manifest.version

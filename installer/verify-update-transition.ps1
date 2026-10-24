@@ -27,13 +27,13 @@ try{
     & $IsccPath /Q ("/DSourceRoot="+$entry[1]) ("/DAppVersion=$version") ("/DTestInstallRoot=$installed") ("/O$out") (Join-Path $PSScriptRoot 'windows.iss')
     if($LASTEXITCODE -ne 0){throw 'Isolated installer build failed'}
   }
-  Run-SilentSetup (Join-Path $root 'old/Codex-Skin-Manager-Setup.exe')
+  Run-SilentSetup (Join-Path $root 'old/CodexPage-Setup.exe')
   Assert-InstalledPayload $OldPackage
   if([IO.File]::ReadAllText((Join-Path $installed 'VERSION')).Trim() -ne $oldVersion){throw 'Baseline version mismatch'}
   [IO.Directory]::CreateDirectory((Join-Path $installed 'wallpaper-library'))|Out-Null
   $keep=Join-Path $installed 'wallpaper-library/user-fixture.txt';[IO.File]::WriteAllText($keep,'user wallpaper and settings fixture')
   $hash=(Get-FileHash $keep).Hash
-  Run-SilentSetup (Join-Path $root 'new/Codex-Skin-Manager-Setup.exe')
+  Run-SilentSetup (Join-Path $root 'new/CodexPage-Setup.exe')
   Assert-InstalledPayload $NewPackage
   if([IO.File]::ReadAllText((Join-Path $installed 'VERSION')).Trim() -ne $newVersion){throw 'Upgrade version mismatch'}
   if((Get-FileHash $keep).Hash -ne $hash){throw 'User library changed'}
